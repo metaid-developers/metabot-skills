@@ -1,0 +1,38 @@
+{
+  "name": "metaid-agent-chat",
+  "version": "1.0.0",
+  "description": "metabot-chat skill for group chat management and messaging",
+  "main": "scripts/main.ts",
+  "scripts": {
+    "check-env": "bash scripts/check_environment.sh",
+    "start": "ts-node scripts/main.ts",
+    "build": "tsc",
+    "chat-reply": "ts-node scripts/chat_reply.ts",
+    "chat-poll": "ts-node scripts/chat_poll_scheduler.ts",
+    "chat-poll:bg": "bash scripts/run_chat_poll_background.sh",
+    "werewolf": "ts-node scripts/werewolf.ts",
+    "rebuttal-chat": "ts-node scripts/rebuttal_chat.ts",
+    "rebuttal-chat:poll": "ts-node scripts/rebuttal_chat_poll.ts",
+    "mixed-chat": "ts-node scripts/mixed_chat.ts",
+    "mixed-chat:poll": "ts-node scripts/mixed_chat_poll.ts"
+  },
+  "dependencies": {
+    "crypto-js": "^4.2.0",
+    "meta-contract": "^0.4.16"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/crypto-js": "^4.2.2",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0"
+  },
+  "keywords": [
+    "metaid",
+    "chat",
+    "group",
+    "messaging",
+    "blockchain"
+  ],
+  "author": "",
+  "license": "MIT"
+}

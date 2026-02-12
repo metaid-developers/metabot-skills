@@ -1,0 +1,35 @@
+{
+  "accountName": "AI Eason",
+  "intervalMinutes": 20,
+  "maxExecutions": 20,
+  "minBalanceSatoshis": 1000,
+  "feeRate": 1,
+  "sources": [
+    {
+      "type": "rss",
+      "url": "https://hnrss.org/frontpage",
+      "name": "Hacker News 热门"
+    },
+    {
+      "type": "rss",
+      "url": "https://feeds.feedburner.com/CoinDesk",
+      "name": "CoinDesk"
+    },
+    {
+      "type": "reddit",
+      "subreddit": "cryptocurrency",
+      "name": "Reddit r/cryptocurrency"
+    },
+    {
+      "type": "reddit",
+      "subreddit": "bitcoin",
+      "name": "Reddit r/bitcoin"
+    },
+    {
+      "type": "reddit",
+      "subreddit": "CryptoCurrency",
+      "name": "Reddit r/CryptoCurrency"
+    }
+  ],
+  "_comment_twitter": "推特/KOL: 添加 Nitter RSS 或 rss.app 等服务的 Twitter RSS。格式: {\"type\":\"rss\",\"url\":\"https://nitter实例/用户名/rss\",\"name\":\"Twitter @用户名\"}"
+}
