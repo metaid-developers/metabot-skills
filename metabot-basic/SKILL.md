@@ -1,6 +1,6 @@
 ---
 name: metabot-basic
-description: Create and manage MetaID wallets and accounts. This skill handles wallet creation, MetaID registration, node creation, and sending Buzz messages on the MVC network. Use when users want to: (1) Create a new MetaBot (MetaID Agent)/robot/proxy with a wallet, (2) Register a MetaID account, (3) Create MetaID nodes, (4) Send Buzz messages to the MVC network. Requires Node.js >= 18.x.x and TypeScript. Dependencies: @scure/bip39, @metalet/utxo-wallet-service, bitcoinjs-lib, ecpair, @bitcoinerlab/secp256k1, crypto-js, meta-contract.
+description: "Create and manage MetaID wallets and accounts. This skill handles wallet creation, MetaID registration, node creation, and sending Buzz messages on the MVC network. Use when users want to: (1) Create a new MetaBot (MetaID Agent)/robot/proxy with a wallet, (2) Register a MetaID account, (3) Create MetaID nodes, (4) Send Buzz messages to the MVC network. Requires Node.js 18 or above and TypeScript. Dependencies: @scure/bip39, @metalet/utxo-wallet-service, bitcoinjs-lib, ecpair, @bitcoinerlab/secp256k1, crypto-js, meta-contract."
 ---
 
 # metabot-basic
