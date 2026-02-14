@@ -19,8 +19,8 @@ try {
 }
 
 async function main() {
-  const agentName = (process.argv[2] || process.env.AGENT_NAME || 'Alice').trim()
-  const groupId = (process.argv[3] || process.env.GROUP_ID || 'c1d5c0c7c4430283b3155b25d59d98ba95b941d9bfc3542bf89ba56952058f85i0').trim()
+  const agentName = (process.argv[2] || process.env.AGENT_NAME || '').trim()
+  const groupId = (process.argv[3] || process.env.GROUP_ID || readConfig().groupId || '').trim()
 
   if (!agentName) {
     console.error('用法: npx ts-node scripts/join_one_agent.ts <Agent名字> [群ID]')

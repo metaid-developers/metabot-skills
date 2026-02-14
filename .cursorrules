@@ -1,0 +1,23 @@
+# MetaApp-Skill Cursor Rules
+
+## 聊天监听脚本在 Cursor 内置终端运行
+
+当用户请求**启动聊天监听**（如「让 XX 开启聊天监听」「开启统一聊天监听」「启动群聊监听」等）时，Cursor AI 执行对应脚本**必须**使用 `required_permissions: ["all"]`，否则会出现：
+
+- **xhr poll error** - Socket.IO 连接 api.idchat.io 被沙箱阻断
+- **fetch failed: getaddrinfo ENOTFOUND api.idchat.io** - 网络访问被阻断
+
+### 适用脚本
+
+- `MetaBot-Chat/scripts/run_unified_chat_listener.sh` - 统一聊天监听（群聊 + 私聊）
+- `MetaBot-Chat/scripts/run_group_chat_listener.sh` - 群聊监听
+
+### 执行规范
+
+当执行上述脚本时，run_terminal_cmd 必须传入：
+
+```
+required_permissions: ["all"]
+```
+
+以实现 Cursor 内一键启动、Socket 连接正常，方便用户无需切换到系统终端。
