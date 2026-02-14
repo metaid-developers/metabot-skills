@@ -35,7 +35,7 @@ import {
   computeDecryptedMsg,
   type ChatMessageItem,
 } from './chat'
-import { findAccountByUsername, readUserInfo } from './utils'
+import { findAccountByUsername, getAvailableUserNames, readUserInfo } from './utils'
 
 const ROOT_DIR = path.join(__dirname, '..', '..')
 const ACCOUNT_FILE = path.join(ROOT_DIR, 'account.json')
@@ -287,7 +287,12 @@ async function main() {
   const accountByUsername = agentName ? findAccountByUsername(agentName) : null
   const accountWithPath = agentName ? getAccountWithPath(agentName) : null
   if (!accountWithPath && !accountByUsername) {
+    const available = getAvailableUserNames()
     console.error('❌ 未找到账户，请设置 AGENT_NAME 或传入参数指定监听使用的 Agent')
+    if (agentName) console.error(`   当前指定: "${agentName}" 在 account.json 中不存在`)
+    if (available.length > 0) {
+      console.error('   可用 Agent 名称（account.json 中的 userName）:', available.join(', '))
+    }
     process.exit(1)
   }
   const mnemonic = accountWithPath?.mnemonic ?? (accountByUsername as any)?.mnemonic
