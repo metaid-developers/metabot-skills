@@ -95,19 +95,23 @@ async function main() {
 
 async function mainWork(agentName: string, otherGlobalMetaId: string) {
   const config = readConfig()
-  const chatConfig = readChatConfig()
-  const privateItem = chatConfig.private.find(
-    (p) => p.otherGlobalMetaId === otherGlobalMetaId || p.otherMetaId === otherGlobalMetaId
-  )
-  if (!privateItem?.sharedSecret) {
-    console.error('未在 chat-config.json 的 private 中找到对方配置，请先收到对方一条私聊后再回复')
-    throw new Error('private item not found')
-  }
-
   const account = findAccountByUsername(agentName)
   if (!account?.mnemonic) {
     console.error('未找到账户:', agentName)
     throw new Error('account not found')
+  }
+  const selfGlobalMetaId = (account as any).globalMetaId || ''
+
+  const chatConfig = readChatConfig()
+  // 必须同时匹配「对方」和「当前 Agent（本方）」：同一对方可能对应多个私聊会话（不同 Agent），用错 sharedSecret 会导致对方解密失败
+  const privateItem = chatConfig.private.find(
+    (p) =>
+      (p.otherGlobalMetaId === otherGlobalMetaId || p.otherMetaId === otherGlobalMetaId) &&
+      (p.metaId === selfGlobalMetaId || !p.metaId)
+  )
+  if (!privateItem?.sharedSecret) {
+    console.error('未在 chat-config.json 的 private 中找到对方配置（或当前 Agent 的会话），请先收到对方一条私聊后再回复')
+    throw new Error('private item not found')
   }
 
   const logPath = getPrivateLogPath(privateItem.sharedSecret)
@@ -138,7 +142,6 @@ async function mainWork(agentName: string, otherGlobalMetaId: string) {
   )
 
   const sharedSecret = privateItem.sharedSecret
-  const selfGlobalMetaId = (account as any).globalMetaId || ''
   const lastSelfMessage = [...entries].reverse().find((e) => e.globalMetaId === selfGlobalMetaId)
   if (lastSelfMessage && lastSelfMessage.content && lastSelfMessage.content.trim() === result.content.trim()) {
     console.log('与上条回复内容相同，跳过发送（避免连续两条相同）')

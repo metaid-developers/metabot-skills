@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 
 /**
- * 按对方 MVC 地址发送一条私聊消息（无需事先有私聊记录）
- * 用法: npx ts-node scripts/send_private_message.ts <agentName> <recipientAddress> <message>
- * 示例: npx ts-node scripts/send_private_message.ts "AI Eason" "16xN11wyQmUTS3qFwaJYbwHbjHaFkibxWo" "你好Eason"
+ * 按对方 MVC 地址或 globalMetaId 发送一条私聊消息
+ * 用法: npx ts-node scripts/send_private_message.ts <agentName> <recipientAddressOrGlobalMetaId> <message>
+ * 示例: npx ts-node scripts/send_private_message.ts "AI Eason" "16xN11wyQmUTS3qFwaJYbwHbjHaFkibxWo" "你好"
+ *       npx ts-node scripts/send_private_message.ts "AI Eason" "idq1g9gsjakcw73f05d2x74ylpaz4a4h3u4c4gjw2n" "你好"  # 按 globalMetaId，需 chat-config 中已有该会话的 sharedSecret
  */
 
 import * as path from 'path'
 import { findAccountByUsername } from './utils'
 import { sendTextForPrivateChat } from './message'
+import { readChatConfig } from './chat-config'
 
 const ROOT = path.join(__dirname, '..', '..')
 let createPin: (params: any, mnemonic: string) => Promise<{ txids: string[]; totalCost: number }>
@@ -41,11 +43,11 @@ function parseAddressIndexFromPath(pathStr: string): number {
 
 async function main() {
   const agentName = process.argv[2] || ''
-  const recipientAddress = process.argv[3] || ''
+  const recipient = process.argv[3] || ''
   const content = process.argv[4] || ''
-  if (!agentName || !recipientAddress || !content) {
-    console.error('用法: npx ts-node scripts/send_private_message.ts <agentName> <recipientAddress> <message>')
-    console.error('示例: npx ts-node scripts/send_private_message.ts "AI Eason" "16xN11wyQmUTS3qFwaJYbwHbjHaFkibxWo" "你好Eason"')
+  if (!agentName || !recipient || !content) {
+    console.error('用法: npx ts-node scripts/send_private_message.ts <agentName> <recipientAddress或globalMetaId> <message>')
+    console.error('示例: npx ts-node scripts/send_private_message.ts "AI Eason" "idq1g9gsjakcw73f05d2x74ylpaz4a4h3u4c4gjw2n" "你好"')
     process.exit(1)
   }
 
@@ -54,24 +56,41 @@ async function main() {
     console.error('未找到账户:', agentName)
     process.exit(1)
   }
+  const selfGlobalMetaId = (account as { globalMetaId?: string }).globalMetaId || ''
 
-  const userInfo = await getUserInfoByAddressByMs(recipientAddress)
-  if (!userInfo?.chatPublicKey) {
-    console.error('该地址未绑定 chatPublicKey，无法发送私聊（对方需先在链上创建 chat 公钥）')
-    process.exit(1)
-  }
-  const toGlobalMetaId = userInfo.globalMetaId || userInfo.metaId
-  if (!toGlobalMetaId) {
-    console.error('无法获取对方 globalMetaId/metaId')
-    process.exit(1)
-  }
+  let toGlobalMetaId: string
+  let sharedSecret: string
 
-  const pathStr = (account as { path?: string }).path || "m/44'/10001'/0'/0/0"
-  const addressIndex = parseAddressIndexFromPath(pathStr)
-  const ecdh = await getEcdhPublickey(account.mnemonic, userInfo.chatPublicKey, { addressIndex })
-  if (!ecdh?.sharedSecret) {
-    console.error('ECDH 协商密钥失败')
-    process.exit(1)
+  if (recipient.startsWith('idq')) {
+    toGlobalMetaId = recipient
+    const chatConfig = readChatConfig()
+    const privateItem = chatConfig.private.find(
+      (p) => (p.otherGlobalMetaId === toGlobalMetaId || p.otherMetaId === toGlobalMetaId) && p.metaId === selfGlobalMetaId
+    )
+    if (!privateItem?.sharedSecret) {
+      console.error('未在 chat-config.json 中找到与该 globalMetaId 的私聊会话（请先收到对方一条私聊后再用 globalMetaId 发送）')
+      process.exit(1)
+    }
+    sharedSecret = privateItem.sharedSecret
+  } else {
+    const userInfo = await getUserInfoByAddressByMs(recipient)
+    if (!userInfo?.chatPublicKey) {
+      console.error('该地址未绑定 chatPublicKey，无法发送私聊（对方需先在链上创建 chat 公钥）')
+      process.exit(1)
+    }
+    toGlobalMetaId = userInfo.globalMetaId || userInfo.metaId || ''
+    if (!toGlobalMetaId) {
+      console.error('无法获取对方 globalMetaId/metaId')
+      process.exit(1)
+    }
+    const pathStr = (account as { path?: string }).path || "m/44'/10001'/0'/0/0"
+    const addressIndex = parseAddressIndexFromPath(pathStr)
+    const ecdh = await getEcdhPublickey(account.mnemonic, userInfo.chatPublicKey, { addressIndex })
+    if (!ecdh?.sharedSecret) {
+      console.error('ECDH 协商密钥失败')
+      process.exit(1)
+    }
+    sharedSecret = ecdh.sharedSecret
   }
 
   try {
@@ -79,14 +98,14 @@ async function main() {
       toGlobalMetaId,
       content,
       0,
-      ecdh.sharedSecret,
+      sharedSecret,
       null,
       [],
       account.userName || agentName,
       account.mnemonic,
       createPin
     )
-    console.log('✅ 私聊已发送至', recipientAddress, '内容:', content)
+    console.log('✅ 私聊已发送至', toGlobalMetaId.slice(0, 20) + '…', '内容:', content)
   } catch (e: any) {
     console.error('发送失败:', e?.message || e)
     process.exit(1)

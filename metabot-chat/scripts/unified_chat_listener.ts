@@ -356,6 +356,8 @@ async function main() {
 
   const maybeTriggerReply = (kind: 'group' | 'private', groupId?: string, otherGlobalMetaId?: string, incomingPinId?: string) => {
     if (process.env.AUTO_REPLY !== '1' && process.env.AUTO_REPLY !== 'true') return
+    /** 仅私聊回复：REPLY_PRIVATE_ONLY=1 时不触发群聊回复 */
+    if (process.env.REPLY_PRIVATE_ONLY === '1' && kind === 'group') return
     if (replyCount >= REPLY_MAX) {
       if (replyCount === REPLY_MAX) {
         console.log(`\n⚠️ 自动回复策略 ${REPLY_MAX} 次已完成，如需继续请输入相关指令或重新设置 REPLY_MAX_COUNT。\n`)
