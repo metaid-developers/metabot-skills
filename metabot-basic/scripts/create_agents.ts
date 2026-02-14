@@ -19,7 +19,13 @@ import {
   getAvatarUrl,
   applyProfileToAccount,
 } from './utils'
-import { hasAvatarFile, loadAvatarAsBase64, AVATAR_SIZE_EXCEEDED_MSG } from './avatar'
+import {
+  hasAvatarFile,
+  loadAvatarAsBase64,
+  loadAvatarFromFilePath,
+  isValidAvatarFilePath,
+  AVATAR_SIZE_EXCEEDED_MSG,
+} from './avatar'
 import { getEcdhPublickey } from './chatpubkey'
 import { getLLMConfigFromEnv } from './env-config'
 
@@ -46,8 +52,13 @@ function syncMetaIdToFiles(mvcAddress: string, metaId: string): void {
  * 创建单个 MetaID Agent
  * @param username 用户名（链上 name 节点）
  * @param profileOverrides 可选人设覆盖，未传则随机分配
+ * @param avatarFilePath 可选，用户拖入对话框的图片路径；不传则从 static/avatar 读取
  */
-export async function createAgent(username: string, profileOverrides?: Partial<AccountProfile>): Promise<void> {
+export async function createAgent(
+  username: string,
+  profileOverrides?: Partial<AccountProfile>,
+  avatarFilePath?: string
+): Promise<void> {
   console.log(`\n🚀 开始创建 MetaID Agent: ${username}`)
   console.log('='.repeat(50))
 
@@ -186,11 +197,18 @@ export async function createAgent(username: string, profileOverrides?: Partial<A
         writeAccountFile(accountData)
       }
 
-      // 1. 头像：若 static/avatar 有图片则创建 avatar pin（文件需小于 1MB）
-      if (hasAvatarFile()) {
+      // 1. 头像：优先使用用户拖入的图片路径，否则从 static/avatar 读取（文件需小于 1MB）
+      const hasAvatar =
+        avatarFilePath && isValidAvatarFilePath(avatarFilePath)
+          ? true
+          : hasAvatarFile()
+      if (hasAvatar) {
         let avatarData: { avatar: string; contentType: string } | null = null
         try {
-          avatarData = await loadAvatarAsBase64()
+          avatarData =
+            avatarFilePath && isValidAvatarFilePath(avatarFilePath)
+              ? await loadAvatarFromFilePath(avatarFilePath)
+              : await loadAvatarAsBase64()
         } catch (e: any) {
           if (e?.message === AVATAR_SIZE_EXCEEDED_MSG) {
             console.log(`⚠️  ${AVATAR_SIZE_EXCEEDED_MSG}`)
@@ -233,7 +251,9 @@ export async function createAgent(username: string, profileOverrides?: Partial<A
           }
         }
       } else {
-        console.log('ℹ️  static/avatar 无图片文件，跳过头像设置（可将图片放入 metabot-basic/static/avatar 后重试）')
+        console.log(
+          'ℹ️  无头像图片，跳过头像设置（请将图片放入 metabot-basic/static/avatar 或提供路径后重试）'
+        )
       }
 
       // 5. chatpubkey：若 userInfo.chatPublicKey 为空则创建
@@ -295,16 +315,24 @@ export async function createAgent(username: string, profileOverrides?: Partial<A
 
 async function main() {
   const args = process.argv.slice(2)
-  const agents = args.length > 0 ? args : ['小橙', 'Nova', '墨白']
+  const avatarIdx = args.indexOf('--avatar')
+  const avatarFilePath =
+    avatarIdx >= 0 && args[avatarIdx + 1] ? args[avatarIdx + 1] : undefined
+  const agents =
+    avatarIdx >= 0
+      ? args.filter((a, i) => a !== '--avatar' && (i < avatarIdx || i > avatarIdx + 1))
+      : args
+  const agentList = agents.length > 0 ? agents : ['小橙', 'Nova', '墨白']
 
   console.log('🎯 开始批量创建 MetaID Agents')
-  console.log(`📋 将创建以下 Agents: ${agents.join(', ')}`)
+  console.log(`📋 将创建以下 Agents: ${agentList.join(', ')}`)
+  if (avatarFilePath) console.log(`🖼️  头像图片: ${avatarFilePath}`)
 
-  for (const agentName of agents) {
+  for (const agentName of agentList) {
     try {
-      await createAgent(agentName)
+      await createAgent(agentName, undefined, avatarFilePath)
       // Wait between creations to avoid rate limiting
-      if (agentName !== agents[agents.length - 1]) {
+      if (agentName !== agentList[agentList.length - 1]) {
         console.log('\n⏳ 等待 5 秒后创建下一个...')
         await sleep(5000)
       }

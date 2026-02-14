@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * 让指定 Agent 加入指定群聊（仅加群，不发言）
- * Usage: npx ts-node scripts/join_one_agent.ts <agentName> [groupId]
+ * 临时脚本：让Alice加入指定群聊
  */
 
 import * as path from 'path'
 import { joinChannel } from './message'
-import { readConfig, addGroupToUser, hasJoinedGroup, findAccountByUsername } from './utils'
+import { addGroupToUser, hasJoinedGroup, findAccountByUsername } from './utils'
 
 let createPin: any = null
 try {
@@ -19,17 +18,8 @@ try {
 }
 
 async function main() {
-  const agentName = (process.argv[2] || process.env.AGENT_NAME || 'Alice').trim()
-  const groupId = (process.argv[3] || process.env.GROUP_ID || 'c1d5c0c7c4430283b3155b25d59d98ba95b941d9bfc3542bf89ba56952058f85i0').trim()
-
-  if (!agentName) {
-    console.error('用法: npx ts-node scripts/join_one_agent.ts <Agent名字> [群ID]')
-    process.exit(1)
-  }
-  if (!groupId) {
-    console.error('❌ 未指定群 ID，请在参数或 config.json 中配置')
-    process.exit(1)
-  }
+  const agentName = 'Alice'
+  const groupId = 'c1d5c0c7c4430283b3155b25d59d98ba95b941d9bfc3542bf89ba56952058f85i0'
 
   const account = findAccountByUsername(agentName)
   if (!account) {

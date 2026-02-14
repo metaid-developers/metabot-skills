@@ -11,7 +11,6 @@
 /metabot-chat/agent.md
 /metabot-chat/my_discussion.log
 /metabot-chat/group_chat_listener.log
-/metabot-flow/node_modules/
 
 
 projects/**/*
@@ -19,19 +18,24 @@ projects/**/*
 # 群聊监听与场景回复 PID 文件（运行时）
 .group_chat_listener.pid
 .scenario_*.pid
+unified_chat_listener.log
 .group_listener_launch.sh
 group_chat_listener.log
 topic_pair_chat_poll.log
 
 # 根目录下的敏感文件（account.json、.env、config.json、userInfo.json、group-list-history.log）
 account.json
+chat-history
 .env
+
 .env.local
 config.json
 userInfo.json
 group-list-history.log
+.unified_chat_listener.pid
 agent.md
 agent2.md
 agent3.md
 agent4.md
 agent5.md
+agent-6.md

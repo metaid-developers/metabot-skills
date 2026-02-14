@@ -14,7 +14,8 @@
     "rebuttal-chat": "ts-node scripts/rebuttal_chat.ts",
     "rebuttal-chat:poll": "ts-node scripts/rebuttal_chat_poll.ts",
     "mixed-chat": "ts-node scripts/mixed_chat.ts",
-    "mixed-chat:poll": "ts-node scripts/mixed_chat_poll.ts"
+    "mixed-chat:poll": "ts-node scripts/mixed_chat_poll.ts",
+    "join-alice": "ts-node scripts/join_one_agent.ts Alice c1d5c0c7c4430283b3155b25d59d98ba95b941d9bfc3542bf89ba56952058f85i0"
   },
   "dependencies": {
     "crypto-js": "^4.2.0",

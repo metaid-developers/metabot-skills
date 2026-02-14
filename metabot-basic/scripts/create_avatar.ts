@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * 为指定 Agent 创建头像节点（从 static/avatar 读取图片）
- * Usage: npx ts-node scripts/create_avatar.ts <userName|mvcAddress|metaid> [图片文件名] [--force]
+ * 为指定 Agent 创建头像节点
+ * 支持：用户拖入对话框的图片路径、static/avatar 下的文件名
+ * Usage: npx ts-node scripts/create_avatar.ts <userName|mvcAddress|metaid> [图片路径或文件名] [--force]
+ * 示例: npx ts-node scripts/create_avatar.ts "肥猪王" /Users/xxx/Downloads/avatar.png
  * 示例: npx ts-node scripts/create_avatar.ts "肥猪王" "images (2).jpeg"
  */
 
+import * as path from 'path'
 import {
   readAccountFile,
   writeAccountFile,
@@ -17,6 +20,8 @@ import { parseAddressIndexFromPath } from './wallet'
 import {
   hasAvatarFile,
   loadAvatarAsBase64,
+  loadAvatarFromFilePath,
+  isValidAvatarFilePath,
   AVATAR_SIZE_EXCEEDED_MSG,
 } from './avatar'
 
@@ -25,19 +30,25 @@ async function main() {
   const force = args.includes('--force') || args.includes('-f')
   const filtered = args.filter((a) => a !== '--force' && a !== '-f')
   const keyword = filtered[0]?.trim()
-  const avatarFilename = filtered[1]?.trim() // 可选：如 "images (2).jpeg"
+  const avatarInput = filtered[1]?.trim() // 可选：完整路径（用户拖入）或 static/avatar 下的文件名
   if (!keyword) {
     console.error(
-      'Usage: npx ts-node scripts/create_avatar.ts <userName|mvcAddress|metaid> [图片文件名] [--force]'
+      'Usage: npx ts-node scripts/create_avatar.ts <userName|mvcAddress|metaid> [图片路径或文件名] [--force]'
     )
     process.exit(1)
   }
 
-  if (!hasAvatarFile(avatarFilename)) {
+  // 优先使用用户提供的文件路径（拖入对话框）；否则从 static/avatar 查找
+  const useFilePath =
+    avatarInput &&
+    (path.isAbsolute(avatarInput) || isValidAvatarFilePath(path.resolve(avatarInput)))
+  const useStaticAvatar = !useFilePath && (avatarInput ? hasAvatarFile(avatarInput) : hasAvatarFile())
+
+  if (!useFilePath && !useStaticAvatar) {
     console.error(
-      avatarFilename
-        ? `❌ static/avatar 下未找到文件: ${avatarFilename}（支持 jpg/png/gif/webp/avif）`
-        : '❌ static/avatar 目录下无图片文件（支持 jpg/png/gif/webp/avif）'
+      avatarInput
+        ? `❌ 未找到有效图片: ${avatarInput}（支持 jpg/png/gif/webp/avif，可为完整路径或 static/avatar 下文件名）`
+        : '❌ 请提供图片路径，或将图片放入 static/avatar 下'
     )
     process.exit(1)
   }
@@ -57,7 +68,9 @@ async function main() {
 
   let avatarData: { avatar: string; contentType: string } | null = null
   try {
-    avatarData = await loadAvatarAsBase64(avatarFilename)
+    avatarData = useFilePath
+      ? await loadAvatarFromFilePath(avatarInput!)
+      : await loadAvatarAsBase64(avatarInput || undefined)
   } catch (e: any) {
     if (e?.message === AVATAR_SIZE_EXCEEDED_MSG) {
       console.error(`❌ ${AVATAR_SIZE_EXCEEDED_MSG}`)

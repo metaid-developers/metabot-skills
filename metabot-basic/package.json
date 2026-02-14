@@ -7,8 +7,6 @@
     "check-env": "bash scripts/check_environment.sh",
     "start": "ts-node scripts/main.ts",
     "build": "tsc",
-    "buzz-scheduler": "ts-node scripts/buzz_scheduler.ts",
-    "buzz-scheduler:once": "ts-node scripts/buzz_scheduler.ts --once",
     "send-buzz": "ts-node scripts/send_buzz.ts",
     "send-space": "ts-node scripts/send_space.ts",
     "send-doge": "ts-node scripts/send_doge.ts",
