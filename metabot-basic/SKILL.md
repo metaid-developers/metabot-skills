@@ -1,82 +1,71 @@
 ---
 name: metabot-basic
-description: MetaID 钱包与账户管理。用于：创建 MetaBot/Agent/代理/用户/机器人、注册 MetaID、创建 MetaID 节点、发送 Buzz。触发词：创建MetaBot、创建代理、创建用户,创建机器人、创建钱包、注册 MetaID。需 Node.js >= 18、TypeScript。
+description: MetaBot 的基础身份与资产管理核心。负责创建 MetaBot 实体（钱包+MetaID）、管理链上资产（MVC/DOGE）、发布基础 Buzz 消息及设置头像。
+dependencies: node >= 18.x, typescript
 ---
 
 # metabot-basic
 
-MetaID 钱包与账户管理，涵盖钱包创建、MetaID 注册、节点创建、Buzz 发送。
+MetaBot 生态的基础设施 Skill。管理 MetaBot 的**身份 (MetaID)**、**钱包 (Wallet)** 和**资产 (Assets)**。
 
-## 触发条件
+## 核心工作流 (Workflows)
 
-用户表达以下意图时激活：
-- 创建 MetaBot / 代理 / 机器人 / 钱包
-- 注册 MetaID
-- 发送 Buzz / 向 MVC 网络发消息
+### 1. 创建 MetaBot (Identity Creation)
+当用户指令涉及“创建 MetaBot”、“注册 MetaID”、“新建机器人/钱包”时，**必须直接执行**以下脚本。
 
-## 快速开始
+* **脚本**: `npx ts-node scripts/create_agents.ts [options]`
+* **功能**: 生成助记词 -> 派生地址 -> 注册 MetaID (自动申请 Gas 补贴) -> 初始化 `account.json`。
+* **头像选项 (Avatar)**:
+    * **自动识别**: 若用户未指定，默认检查 `static/avatar/` 目录下是否有图片。
+    * **指定路径**: `npx ts-node scripts/create_agents.ts --avatar "path/to/image.png"`
+    * **独立设置**: 若 MetaBot 已存在但需补设头像，执行 `npx ts-node scripts/create_avatar.ts "MetaBotName" "path/to/image.png"`。
 
-```bash
-ts-node scripts/main.ts "<用户提示词>"
-```
+### 2. 资产转账 (Asset Transfer)
+管理 MetaBot 的链上资金。执行前**必须请求用户二次确认**金额与地址。
 
-- 环境：Node.js >= 18，TypeScript，`npm install`
-- 校验：`scripts/check_environment.sh`
+* **MVC 转账 (Space)**:
+    * **脚本**: `npx ts-node scripts/send_space.ts`
+    * **注意**: 金额单位为 **sats** (1 Space = 10^8 sats)。
+* **DOGE 转账**:
+    * **脚本**: `npx ts-node scripts/send_doge.ts`
+    * **限制**: 最小转账金额 0.01 DOGE。
 
-## 核心能力
+### 3. 数据发布 (Data Publishing)
+MetaBot 在链上发布基础数据或协议节点。
 
-1. **钱包**：生成助记词，派生 MVC/BTC/DOGE 地址
-2. **MetaID 注册**：Gas 补贴、name 节点
-3. **Buzz**：simpleBuzz 发帖
-4. **createPin**：统一 API 创建/修改任意 MetaID 节点
-5. **内置**：`signTransaction`、`pay`、`getNetwork`；DOGE 本地钱包见 `doge-wallet-local.ts`
+* **发布 Buzz**: `npx ts-node scripts/main.ts "发送一条 Buzz: <内容>"` (基于 `simpleBuzz` 协议)。
+* **发布带图片附件的 Buzz**: 当用户要求将**本地图片**作为附件发 buzz，或使用**已有 pinId** 作为图片附件发 buzz 时，使用 `send_buzz_with_image.ts`。流程：先上链得 pinId（若为本地图片则调用 metabot-file 上传）→ 组装 simplebuzz `attachments: ["metafile://<pinId>.png"]` → 发送。
+    * **本地图片**: `npx ts-node scripts/send_buzz_with_image.ts "<agentName>" "<content>" --image <path>`
+    * **已有 pinId**: `npx ts-node scripts/send_buzz_with_image.ts "<agentName>" "<content>" --pinid <pinid> [--ext .png]`
+* **通用 PIN 创建**: `npx ts-node scripts/metaid.ts createPin ...` (用于自定义协议数据上链)。
+* **初始化聊天密钥**: `npx ts-node scripts/create_chatpubkey.ts` (为 `metabot-chat` 准备)。
 
-## 头像设置
+## 配置与状态 (Configuration)
 
+### 账户文件 (`account.json`)
+* **位置**: 项目根目录。
+* **作用**: 存储所有 MetaBot 的助记词、地址 (MVC/BTC/DOGE) 和 MetaID 信息。
+* **读取规则**:
+    * **默认**: 使用 `accountList[0]`。
+    * **指定**: 通过 MetaBot 名称 (`userName`) 或地址匹配。
+    * **新增**: 新创建的 MetaBot 会自动插入到列表头部 (`unshift`)。
 
-**可行方式**：
-1. **保存到目录**：将图片保存到 `metabot-basic/static/avatar/`，执行时会自动读取
-2. **@ 引用**（Cursor）：先保存图片到项目内（如 `static/avatar/henry.png`），在对话中用 `@MetaBot-Basic/static/avatar/henry.png` 引用，Skill 可解析路径并执行
-3. **提供路径**：用户提供本地完整路径，Skill 传给 `create_avatar <Agent名> <路径>`
+## 脚本索引 (Script Index)
 
-- 创建 Agent：`create_agents.ts` 支持 `--avatar <路径>`；或依赖 `static/avatar` 下已有图片
-- 为已有 Agent 设头像：`npm run create-avatar -- "Agent名"` 或 `... "Agent名" <路径>`
-- 限制：< 1MB；超限提示「上传头像文件超过1 MB...」并跳过
+| 脚本 | 核心功能 | 参数说明 |
+| :--- | :--- | :--- |
+| **`create_agents.ts`** | **创建/注册** | 支持批量创建，支持 `--avatar`。 |
+| `create_avatar.ts` | **头像管理** | `[AgentName] [FilePath]`。限制 < 1MB。 |
+| `create_chatpubkey.ts` | **聊天初始化** | 上链 Chat 公钥，启用加密通讯。 |
+| `send_space.ts` | **MVC 转账** | 交互式或参数调用。单位：Satoshis。 |
+| `send_doge.ts` | **DOGE 转账** | 交互式或参数调用。 |
+| **`send_buzz_with_image.ts`** | **带图 Buzz** | `<agentName>` `<content>`，`--image <path>` 或 `--pinid <pinid>`，可选 `--ext`。 |
+| `metaid.ts` | **底层操作** | 提供 `createPin`, `pay` 等原子操作。 |
+| `wallet.ts` | **钱包工具** | 提供 `signTransaction` (供其他 Skill 调用)。 |
 
-## 钱包与账户
+## 行为规范 (AI Constraints)
 
-- 新建：触发词含「创建」等；新钱包 unshift 到 accountList 前
-- 已有：按 username/address 匹配，无匹配用 accountList[0]
-- 完整结构、path、addressIndex、llm 等：见 **references/account-management.md**
-
-## Scripts 速查
-
-| 脚本 | 用途 |
-|------|------|
-| main.ts | 主流程编排 |
-| create_agents.ts | 批量创建 Agent（支持 `--avatar <路径>`） |
-| create_avatar.ts | 为已有 Agent 设头像 |
-| create_chatpubkey.ts | 创建 chatpubkey |
-| send_space.ts | MVC 转账（sats，人机确认） |
-| send_doge.ts | DOGE 转账（最小 0.01 DOGE） |
-| wallet.ts | signTransaction、getMnemonicFromAccount |
-| metaid.ts | createPin、pay |
-| transfer.ts | sendSpace、sendDoge |
-| avatar.ts | 从路径/static/avatar 加载头像 |
-
-## 转账与 createPin
-
-- **MVC**：`sendSpace`，amount 用 sats；1 Space = 10^8 sats；人机确认后执行
-- **DOGE**：`sendDoge`，最小 0.01 DOGE
-- **createPin**：path 小写；modify 需 `@pinId/protocols/xxx`；协议示例见 references/metaid-protocol.md
-
-## Cursor 执行规范
-
-当用户请求「执行某命令」时：先说明推荐方案，**然后代为执行**，让用户一键确认即可跑起来，而非仅贴命令。
-
-## References
-
-- `references/account-management.md` - account.json 结构与字段说明
-- `references/wallet-operations.md` - 钱包、addressIndex、signTransaction、pay
-- `references/metaid-protocol.md` - createPin、协议示例
-- `references/buzz-protocol.md` - Buzz 协议
+1.  **执行优先**: 当用户要求“创建一个叫 Alice 的 MetaBot”时，不要返回操作指南，**直接生成并运行**对应的 `create_agents.ts` 命令。
+2.  **路径智能**: 处理头像路径时，若用户提供了 `@引用` 或相对路径，Cursor 需自动将其解析为系统绝对路径传入脚本。
+3.  **余额单位**: 涉及 MVC 转账时，**必须**将用户口语中的 "Space" 转换为 "sats" (乘以 10^8) 传入脚本。
+4.  **带图 Buzz**: 当用户说「将 xx 作为附件发送 buzz」「用 pinid 发送带图 buzz」等时，使用 `send_buzz_with_image.ts`，传入对应 agent、文字内容及 `--image <path>` 或 `--pinid <pinid>`。
