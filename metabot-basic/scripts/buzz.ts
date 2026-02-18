@@ -11,13 +11,15 @@ export interface BuzzBody {
 export type CreateBuzzOptions = { addressIndex?: number }
 
 /**
- * Create and send a Buzz message
+ * Create and send a Buzz message.
+ * @param attachments - Optional array of attachment URIs (e.g. ["metafile://<pinId>.png"] for image buzz).
  */
 export async function createBuzz(
   mnemonic: string,
   content: string,
   feeRate: number = 1,
-  options?: CreateBuzzOptions
+  options?: CreateBuzzOptions,
+  attachments?: string[]
 ): Promise<{ txids: string[]; totalCost: number }> {
   if (!mnemonic) {
     throw new Error('mnemonic is required')
@@ -30,7 +32,7 @@ export async function createBuzz(
   const body: BuzzBody = {
     content: content,
     contentType: 'text/plain;utf-8',
-    attachments: [],
+    attachments: attachments && attachments.length > 0 ? attachments : [],
     quotePin: ''
   }
 

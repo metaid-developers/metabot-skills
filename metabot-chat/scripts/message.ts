@@ -1,5 +1,6 @@
 import { MessageType, ChatMessageItem } from './chat'
 import { encryptMessage } from './chat'
+import { ecdhEncrypt } from './crypto'
 import { CreatePinParams, CreatePinResult } from './metaid-agent-types'
 
 // Import createPin from metabot-basic skill
@@ -10,6 +11,7 @@ import { CreatePinParams, CreatePinResult } from './metaid-agent-types'
 export enum NodeName {
   SimpleGroupChat = 'simplegroupchat',
   SimpleGroupJoin = 'simplegroupjoin',
+  SimpleMsg='simplemsg'
 }
 
 export const enum CommunityJoinAction {
@@ -152,6 +154,74 @@ export const joinChannel = async (
   } catch (error) {
     throw new Error(error as any)
   }
+}
+
+/**
+ * 发送私聊原始消息（content 已加密）
+ */
+export async function sendMessageForPrivate(
+  to: string,
+  content: string,
+  messageType: MessageType = MessageType.msg,
+  reply: ChatMessageItem | null,
+  mentions: Mention[],
+  userName: string,
+  mnemonic: string,
+  createPinFn: (params: CreatePinParams, mnemonic: string) => Promise<CreatePinResult>
+): Promise<{ txids: string[]; totalCost: number }> {
+  const contentType = 'text/plain'
+  const encryption = 'aes'
+  const body = {
+    to,
+    channelID: undefined,
+    timestamp: Date.now(),
+    nickName: userName || '',
+    content,
+    contentType,
+    encryption,
+    replyPin: reply ? `${reply.txId}i0` : '',
+    mention: mentions && mentions.length > 0 ? mentions.map((m) => m.globalMetaId) : [],
+  }
+  const sendPrivateChatParams: CreatePinParams = {
+    chain: 'mvc',
+    dataList: [
+      {
+        metaidData: {
+          operation: 'create',
+          path: `/protocols/${NodeName.SimpleMsg}`,
+          body: JSON.stringify(body),
+          contentType: 'application/json',
+        },
+      },
+    ],
+    feeRate: 1,
+  }
+  const result = await createPinFn(sendPrivateChatParams, mnemonic)
+  if (result.txids && result.txids.length > 0) {
+    return { txids: result.txids, totalCost: result.totalCost }
+  }
+  throw new Error('Failed to create private msg: no txids returned')
+}
+
+/**
+ * 私聊发送明文（内部用 sharedSecret 加密）
+ * @param to 对方 globalMetaId
+ * @param content 明文
+ * @param secretKeyStr 协商密钥 sharedSecret
+ */
+export const sendTextForPrivateChat = async (
+  to: string,
+  content: string,
+  messageType: MessageType,
+  secretKeyStr: string,
+  reply: ChatMessageItem | null,
+  mentions: Mention[],
+  userName: string,
+  mnemonic: string,
+  createPinFn: (params: CreatePinParams, mnemonic: string) => Promise<CreatePinResult>
+): Promise<{ txids: string[]; totalCost: number }> => {
+  const encryptContent = ecdhEncrypt(content, secretKeyStr)
+  return await sendMessageForPrivate(to, encryptContent, messageType, reply, mentions, userName, mnemonic, createPinFn)
 }
 
 /**

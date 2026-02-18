@@ -1134,3 +1134,19 @@ export function findAccountByUsername(username: string): {
   }
   return null
 }
+
+/**
+ * 从 account.json 读取所有可用的 userName 列表（供未找到账户时提示）
+ */
+export function getAvailableUserNames(): string[] {
+  try {
+    if (!fs.existsSync(ACCOUNT_FILE)) return []
+    const content = fs.readFileSync(ACCOUNT_FILE, 'utf-8')
+    const data = JSON.parse(content)
+    return (data.accountList || [])
+      .map((a: any) => (a.userName || '').trim())
+      .filter((n: string) => n.length > 0)
+  } catch {
+    return []
+  }
+}

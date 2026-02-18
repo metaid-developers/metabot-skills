@@ -4,6 +4,31 @@ const Utf8 = enc.Utf8
 const iv = Utf8.parse('0000000000000000')
 
 /**
+ * 私聊加密（ECDH 协商密钥）
+ * @param message 明文
+ * @param secretKey 协商得到的 sharedSecret（hex 字符串）
+ * @returns Base64 密文
+ */
+export function ecdhEncrypt(message: string, secretKey: string): string {
+  return AES.encrypt(message, secretKey).toString()
+}
+
+/**
+ * 私聊解密（ECDH 协商密钥）
+ * @param cipherText Base64 密文
+ * @param secretKey 协商得到的 sharedSecret（hex 字符串）
+ * @returns 明文
+ */
+export function ecdhDecrypt(cipherText: string, secretKey: string): string {
+  try {
+    const bytes = AES.decrypt(cipherText, secretKey)
+    return bytes.toString(Utf8) || cipherText
+  } catch {
+    return cipherText
+  }
+}
+
+/**
  * Decrypt group chat message
  * @param message - Encrypted message (hex string)
  * @param secretKeyStr - Secret key string (16 characters)

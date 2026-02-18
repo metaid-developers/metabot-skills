@@ -485,6 +485,8 @@ export async function generateChatReply(
     mentionTargetContent?: string
     /** 自由讨论话题：注入后 Agent 围绕此话题自由发言，可提问、反驳、补充 */
     discussionTopic?: string
+    /** 是否为私聊回复：仅针对对方最新消息做一条简短回复，不展开、不连发 */
+    isPrivateChat?: boolean
   },
   config?: Partial<LLMConfig>
 ): Promise<{ content: string; mentionName?: string }> {
@@ -492,7 +494,15 @@ export async function generateChatReply(
   const preference = userProfile?.preference || ''
   const goal = userProfile?.goal || ''
 
-  const systemPrompt = options.hasMetaIDAgentMention
+  const systemPrompt = options.isPrivateChat
+    ? `你是"${agentName}"，正在与对方私聊。
+
+【人设】性格：${character}，兴趣：${preference || '广泛'}，目标：${goal || '参与交流'}
+
+【任务】根据下方「最近聊天记录」，针对对方最新一条或几条消息做一次简短、自然的回复。只生成一条回复内容，不要连续多条、不要刷屏。
+
+【重要】模仿人类对话：有新消息就针对新消息或最近上下文适当回复即可。回复长度适中（通常一两句到几句），语气自然，可简短可稍展开，但每次只输出一条回复。禁止在一条回复里模拟多轮对话或列出多条回答。`
+    : options.hasMetaIDAgentMention
     ? `你是"${agentName}"，在 🤖MetaBot 畅聊群中。有人提到了 metabot-basic，请重点回复此人。
 
 【人设】性格：${character}，兴趣：${preference || '广泛'}，目标：${goal || '参与交流'}
@@ -516,7 +526,9 @@ ${options.discussionTopic ? `\n【当前讨论话题】大家正在自由讨论�
 
 【人类化表达】像真实群聊：有时只回几个字（如"哈哈"、"确实"、"+1"），有时几十字展开。语气要有变化——可轻松、可调侃、可认真、可敷衍。禁止每次都用相似长度和语气。`
 
-  const userPrompt = `【最近30条聊天记录】\n${recentMessages.join('\n')}\n\n请生成你的回复（纯文本）：`
+  const userPrompt = options.isPrivateChat
+    ? `【最近聊天记录】\n${recentMessages.join('\n')}\n\n请针对对方最新消息或最近对话，生成你的一条回复（纯文本，仅一条）：`
+    : `【最近30条聊天记录】\n${recentMessages.join('\n')}\n\n请生成你的回复（纯文本）：`
 
   try {
     const response = await generateLLMResponse(

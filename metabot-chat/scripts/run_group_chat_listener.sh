@@ -2,6 +2,7 @@
 # 群聊监听启动脚本
 # 当用户说「开启群聊」「监听群聊」「让 XX Agent 监听群聊信息」等时，由 metabot-chat skills 自动调用
 # 默认在系统自带终端（Terminal.app）中启动监听，以保证网络权限、避免 fetch 失败
+# Cursor 内置终端运行需 network/all 权限，否则会 xhr poll error / ENOTFOUND（见 .cursorrules / SKILL.md）
 #
 # 用法: ./run_group_chat_listener.sh [group_id] [agent_name] [log_file]
 #       不传 agent_name 或加 --all-agents：所有群内 Agent 参与（被 @ 优先）

@@ -31,6 +31,7 @@ import {
 } from './utils'
 import { generateChatReply, getResolvedLLMConfig } from './llm'
 import { joinChannel } from './message'
+import { getGroupLogPath, getHistoryLogEntries } from './chat-config'
 
 let createPin: any = null
 try {
@@ -79,7 +80,23 @@ async function main() {
   const specifiedAgent = (process.env.AGENT_NAME || process.argv[2])?.trim()
 
   const config = readConfig()
-  const GROUP_ID = config.groupId || DEFAULT_GROUP_ID
+  // 获取 groupId 优先级：1) env.GROUP_ID 2) 当前操作用户在 userInfo.groupList 中的群 3) config.groupId 4) 默认
+  let GROUP_ID = (process.env.GROUP_ID || '').trim()
+  if (!GROUP_ID && specifiedAgent) {
+    const userInfo = readUserInfo()
+    const currentUser = userInfo.userList.find(
+      (u) => u.userName && u.userName.trim().toLowerCase() === specifiedAgent.trim().toLowerCase()
+    )
+    if (currentUser?.groupList?.length) {
+      const configGroupId = (config.groupId || '').trim()
+      GROUP_ID = currentUser.groupList.includes(configGroupId)
+        ? configGroupId
+        : currentUser.groupList[0].trim()
+    }
+  }
+  if (!GROUP_ID) {
+    GROUP_ID = (config.groupId || DEFAULT_GROUP_ID).trim()
+  }
   config.groupId = GROUP_ID
   writeConfig(config)
 
@@ -92,7 +109,13 @@ async function main() {
   const secretKeyStr = GROUP_ID.substring(0, 16)
   await fetchAndUpdateGroupHistory(GROUP_ID, secretKeyStr)
 
-  const entries = getRecentChatEntriesWithSpeakers(GROUP_ID)
+  // 优先从 chat-history 群聊 log 读取（unified_chat_listener 写入源），确保 Socket 推送的新消息可被回复
+  const groupLogPath = getGroupLogPath(GROUP_ID)
+  let entries = getHistoryLogEntries(groupLogPath, 30)
+    .filter((e) => e.content && (e.content as string).trim())
+  if (entries.length === 0) {
+    entries = getRecentChatEntriesWithSpeakers(GROUP_ID)
+  }
   const recentMessages = entries.map((e) => `${e.userInfo?.name || '未知'}: ${e.content}`)
 
   if (recentMessages.length === 0) {

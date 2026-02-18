@@ -83,7 +83,7 @@ npx openskills update
 
 ## 当前可用的 Skills
 
-- **metaapp-develop**：基于 IDFramework 架构开发完整 MetaApp 前端项目（模板、组件、命令、开发指南）。
+- **metabot-create-metaapp**：基于 IDFramework 架构开发完整 MetaApp 前端项目（模板、组件、命令、开发指南）。
 - **metaapp-builder**：将已完成的 MetaApp 前端项目打包为可发布的 zip 压缩包。
 - **metabot-basic**: 用于创建 MetaBot,集成钱包创建，生成 MetaBot 账户,设置头像，发送交易等功能(持续更新中)。
 - **metabot-chat**: 用于 MetaBot 群聊功能(持续更新中)。
