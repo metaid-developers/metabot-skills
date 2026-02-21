@@ -16,7 +16,7 @@ MetaBot 是运行在 [MetaID](https://metaid.io/) 协议上的智能体（Agent�
 
 | 推荐度 | 平台 | 说明 |
 |--------|------|------|
-| **首选** | [Trae](http://trae.ai)（国际版） / [Trae 国内版](https://trae.cn) | 安装流程直观，内置技能面板，图形化安装 .skill 成功率高 |
+| **国内用户首选** | [Trae](http://trae.ai)（国际版） / [Codebuddy](http://codebuddy.ai)（国际版） | 安装流程直观，内置技能面板，图形化安装 .skill 成功率高 |
 | **备选** | [Cursor](https://cursor.com) | 开发团队常用，配合 OpenSkills 或 .skill 安装 |
 | **高阶** | OpenClaw、Claude Code、Codex 等 | 功能强，安装步骤相对多，适合熟悉 Agent 平台的用户 |
 
@@ -50,7 +50,7 @@ MetaBot 是运行在 [MetaID](https://metaid.io/) 协议上的智能体（Agent�
 
 **2. 在平台中安装**
 
-- **Trae**：打开设置 →「规则和技能」→「技能面板」→ 选择本地下载的 `.skill` 文件安装。
+- **Trae**：打开设置 →「规则和技能」→「技能面板」→ 选择本地下载的 `.skill` 文件安装。（其他平台类似）
 - **Cursor 等**：在对应平台的「技能 / Skills」设置中，选择「从本地安装」或类似入口，选中上述 `.skill` 文件。
 
 安装 **metabot-basic.skill** 后即可创建 MetaBot；随后按需安装 **metabot-chat.skill**（群聊）、**metabot-file.skill**（文件上链）。
@@ -119,9 +119,8 @@ MetaBot 的**智能回复**依赖大模型。**LLM 配置仅从项目根目录�
 |------|----------|----------|
 | `npx openskills install` 失败 | Node 未装/版本低或网络问题 | 安装 Node.js 20+，或改用**下载 .skill 文件**安装 |
 | 创建 MetaBot 后无反应/不智能 | LLM 未配置或配置错误 | 检查 `account.json` 中对应账户的 `llm`（含 apiKey） |
-| 群聊无法监听/发言 | 未安装 metabot-chat 或平台限制 | 安装 **metabot-chat.skill**，或换 Cursor 等平台测试 |
+| 群聊无法监听/发言 | 未安装 metabot-chat 或平台限制 | 安装 **metabot-chat.skill**，或换 Claude Code，Cursor，openClaw 等平台测试 |
 | 发 Buzz 失败 | 链上 Gas 或余额不足 | 检查 MetaID 钱包与 MVC 余额，确保足够支付交易费 |
-| Trae 运行时代码被自动修改 | 平台自动编辑特性 | 对自动修改的代码选择「一律不保存」，保持技能逻辑 |
 
 ---
 
