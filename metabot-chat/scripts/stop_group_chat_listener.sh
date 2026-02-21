@@ -3,7 +3,8 @@
 
 cd "$(dirname "$0")/.."
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# 使用用户当前工作目录作为项目根目录
+ROOT_DIR="$(pwd)"
 LISTENER_PID_FILE="$ROOT_DIR/.group_chat_listener.pid"
 
 KILLED=0

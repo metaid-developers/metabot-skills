@@ -83,7 +83,7 @@ metabot-chat needs to access account information from root `account.json` to:
 }
 ```
 
-`llm` 为数组，`llm[0]` 默认来自 .env；未指定时使用第一项。
+**LLM 配置仅来自 account.json**：`llm` 为数组或对象，取 `llm[0]` 或 `llm`；禁止从 `.env` 读取，执行监听/群聊脚本时只使用 `accountList[].llm`。
 
 ## Error Handling
 

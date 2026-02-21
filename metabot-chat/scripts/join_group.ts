@@ -2,7 +2,7 @@
 
 import * as path from 'path'
 import { joinChannel } from './message'
-import { readConfig, addGroupToUser, hasJoinedGroup, findAccountByUsername, startGroupChatListenerAndPrintInstructions } from './utils'
+import { readConfig, writeConfig, addGroupToUser, hasJoinedGroup, findAccountByUsername, startGroupChatListenerAndPrintInstructions } from './utils'
 
 // Import createPin from metabot-basic skill (cross-skill call)
 let createPin: any = null
@@ -21,24 +21,40 @@ try {
 
 async function joinGroup() {
   const args = process.argv.slice(2)
-  const address = args[0] || '19vUPMweuiFeX9ipFPVYw1SApAZB9wHxoo'
-  
+  const addressOrName = (args[0] || '').trim()
+  const groupIdFromArg = (args[1] || '').trim()
+  const groupIdFromEnv = (process.env.GROUP_ID || '').trim()
+
+  if (!addressOrName) {
+    console.error('❌ 用法: npx ts-node scripts/join_group.ts <agent_name 或 mvc_address> [group_id]')
+    console.error('   或: GROUP_ID=<groupid> npx ts-node scripts/join_group.ts "<agent_name>"')
+    console.error('   示例: npx ts-node scripts/join_group.ts "YourAgentName" "c1d5c0c7...i0"')
+    process.exit(1)
+  }
+
   try {
-    // Read configuration
     const config = readConfig()
-    if (!config.groupId) {
-      console.error('❌ groupId is not configured in config.json')
+    const groupId = groupIdFromArg || groupIdFromEnv || (config.groupId || '').trim()
+    if (!groupId) {
+      console.error('❌ 请提供 GROUP_ID：可通过第二参数、环境变量 GROUP_ID 或 config.json 中的 groupId 传入')
       process.exit(1)
     }
+    if (groupId !== config.groupId) {
+      config.groupId = groupId
+      writeConfig(config)
+    }
 
-    // Find account by address
-    let account = findAccountByUsername('AI Eason')
-    if (!account || account.mvcAddress !== address) {
+    // Try to find account by username first, then by address
+    let account = findAccountByUsername(addressOrName)
+    if (!account) {
       // Try to find by address directly
       const accountData = require('../../account.json')
-      const foundAccount = accountData.accountList.find((acc: any) => acc.mvcAddress === address)
+      const foundAccount = accountData.accountList.find(
+        (acc: any) => acc.mvcAddress === addressOrName || acc.userName === addressOrName
+      )
       if (!foundAccount) {
-        console.error(`❌ Account not found for address: ${address}`)
+        console.error(`❌ Account not found: ${addressOrName}`)
+        console.error('   请确保 account.json 中有该 Agent 的配置')
         process.exit(1)
       }
       account = {
@@ -52,7 +68,7 @@ async function joinGroup() {
     console.log(`🤖 Found agent: ${account.userName} (${account.mvcAddress})`)
 
     // Check if user has joined the group
-    if (hasJoinedGroup(account.mvcAddress, config.groupId)) {
+    if (hasJoinedGroup(account.mvcAddress, groupId)) {
       console.log('✅ Already joined the group')
       return
     }
@@ -61,7 +77,7 @@ async function joinGroup() {
     console.log('📥 Joining group...')
     try {
       const joinResult = await joinChannel(
-        config.groupId,
+        groupId,
         account.mnemonic,
         createPin
       )
@@ -71,18 +87,16 @@ async function joinGroup() {
         console.log(`   TXID: ${joinResult.txids[0]}`)
         console.log(`   Cost: ${joinResult.totalCost} satoshis`)
         
-        // Update userInfo.json
         addGroupToUser(
           account.mvcAddress,
           account.userName,
-          config.groupId,
+          groupId,
           account.globalMetaId
         )
         console.log('✅ User info updated')
 
-        // 加群成功后默认开启群聊监听，并输出关闭/查看群聊的脚本说明
         console.log('\n📡 正在为您开启群聊监听...\n')
-        startGroupChatListenerAndPrintInstructions(config.groupId, account.userName)
+        startGroupChatListenerAndPrintInstructions(groupId, account.userName)
       } else {
         throw new Error('No txids returned')
       }

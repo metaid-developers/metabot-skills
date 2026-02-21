@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import * as path from 'path'
-import { sendTextForChat, joinChannel, getMention } from './message'
+import { spawn } from 'child_process'
+import { sendTextForChat, joinChannel } from './message'
 import {
   readConfig,
   writeConfig,
@@ -16,6 +17,7 @@ import {
   findAccountByUsername,
   startGroupChatListenerAndPrintInstructions,
 } from './utils'
+import { getResolvedLLMConfig, generateLLMResponse } from './llm'
 
 // Import createPin from metabot-basic skill (cross-skill call)
 // Note: Adjust the path based on your workspace structure
@@ -41,18 +43,27 @@ async function main() {
   const userPrompt = args.join(' ')
 
   if (!userPrompt) {
-    console.log('Usage: ts-node scripts/main.ts "<your prompt>"')
-    console.log('Example: ts-node scripts/main.ts "让AI Eason在群聊中讨论区块链技术"')
+    console.log('Usage: npx ts-node scripts/main.ts "<your prompt>"')
+    console.log('Example: npx ts-node scripts/main.ts "让 <metabot-name> 加入群聊 <groupid> 并打个招呼"')
+    console.log('Example: npx ts-node scripts/main.ts "让 <metabot-name> 监听群聊 <groupid>，并按以下策略回复：1. 回复所有消息 2. 当有人点名时必须回复"')
     process.exit(1)
   }
 
   try {
-    // Read configuration
     const config = readConfig()
-    if (!config.groupId) {
-      console.error('❌ groupId is not configured in config.json')
-      process.exit(1)
+    // 从 prompt 解析 groupid（64位 hex + i + 数字）
+    const groupIdMatch = userPrompt.match(/群聊\s*([a-f0-9]{64}i\d+)/i) || userPrompt.match(/群\s*([a-f0-9]{64}i\d+)/i)
+    const parsedGroupId = groupIdMatch ? groupIdMatch[1].trim() : null
+    const groupId = (parsedGroupId || process.env.GROUP_ID || config.groupId || '').trim()
+    if (groupId && groupId !== config.groupId) {
+      config.groupId = groupId
+      writeConfig(config)
     }
+
+    // 意图：加入群聊并打招呼 / 监听群聊
+    const intentJoinAndGreet = /加入群聊|进群/.test(userPrompt) && /打招呼|打个招呼|问好/.test(userPrompt)
+    const intentListen = /监听群聊|开启群聊|监听(?:群聊)?/.test(userPrompt)
+    const strategyMentionOnly = /点名时(?:必须)?回复|仅回复\s*@|@\s*提及.*回复/.test(userPrompt)
 
     // Extract agent name and content from prompt
     // Try to extract content first (e.g., "内容为'大家好'")
@@ -99,7 +110,7 @@ async function main() {
 
     if (!agentName) {
       console.error('❌ Could not extract agent name from prompt')
-      console.error('Please specify agent name, e.g., "让AI Eason在群聊中讨论..."')
+      console.error('Please specify agent name, e.g., "让<agent_name>在群聊中讨论..."')
       process.exit(1)
     }
 
@@ -113,22 +124,97 @@ async function main() {
 
     console.log(`🤖 Found agent: ${account.userName} (${account.mvcAddress})`)
 
-    // Check if user has joined the group
-    if (!hasJoinedGroup(account.mvcAddress, config.groupId)) {
+    // 仅监听群聊：启动 Socket 监听后返回
+    if (intentListen && !intentJoinAndGreet) {
+      if (!groupId) {
+        console.error('❌ 请提供要监听的群聊 GROUP_ID（在指令中写出 groupid，或设置 config.json / 环境变量 GROUP_ID）')
+        process.exit(1)
+      }
+      const scriptDir = path.join(__dirname, '..')
+      const listenerScript = path.join(scriptDir, 'scripts', 'run_unified_chat_listener.sh')
+      const listenerArgs = [agentName, '--auto-reply']
+      if (strategyMentionOnly) listenerArgs.push('--mention-only')
+      const child = spawn('bash', [listenerScript, ...listenerArgs], {
+        cwd: path.join(scriptDir, '..'),
+        stdio: 'inherit',
+        env: { ...process.env, GROUP_ID: groupId },
+      })
+      child.on('error', (err) => {
+        console.error('❌ 启动监听失败:', err.message)
+        console.log('   兜底：可改用 HTTP 轮询: scripts/run_group_chat_listener.sh "' + groupId + '" "' + agentName + '"')
+      })
+      return
+    }
+
+    // 加入群聊并打招呼
+    if (intentJoinAndGreet) {
+      if (!groupId) {
+        console.error('❌ 请提供群聊 GROUP_ID（在指令中写出 groupid，或设置 config.json / 环境变量 GROUP_ID）')
+        process.exit(1)
+      }
+      if (!hasJoinedGroup(account.mvcAddress, groupId)) {
+        console.log('📥 Joining group...')
+        const joinResult = await joinChannel(groupId, account.mnemonic, createPin)
+        if (!joinResult.txids || joinResult.txids.length === 0) {
+          console.error('❌ Failed to join group')
+          process.exit(1)
+        }
+        console.log(`✅ Joined group successfully! TXID: ${joinResult.txids[0]}`)
+        addGroupToUser(account.mvcAddress, account.userName, groupId, account.globalMetaId)
+      } else {
+        console.log('✅ Already joined the group')
+      }
+      const llmConfig = getResolvedLLMConfig(account, config)
+      if (!llmConfig.apiKey) {
+        console.error('❌ 请在 account.json 中为该 MetaBot 配置 llm（含 apiKey）')
+        process.exit(1)
+      }
+      const greetingRes = await generateLLMResponse(
+        [
+          { role: 'system', content: '你刚加入该群，请用一两句话简短打招呼，不要 @ 自己。' },
+          { role: 'user', content: '（无历史）请发一句简短打招呼。' },
+        ],
+        llmConfig
+      )
+      const secretKeyStr = groupId.substring(0, 16)
+      const sendResult = await sendTextForChat(
+        groupId,
+        greetingRes.content.trim(),
+        0,
+        secretKeyStr,
+        null,
+        [],
+        account.userName,
+        account.mnemonic,
+        createPin
+      )
+      if (sendResult.txids?.length) {
+        console.log('✅ 打招呼已发送')
+        await fetchAndUpdateGroupHistory(groupId, secretKeyStr)
+      }
+      if (intentListen) {
+        console.log('\n📡 正在为您开启群聊监听...\n')
+        startGroupChatListenerAndPrintInstructions(groupId, agentName)
+      }
+      console.log('✅ All operations completed successfully!')
+      return
+    }
+
+    // 以下为「在群聊中讨论/发言」流程，需 groupId
+    if (!groupId) {
+      console.error('❌ 请提供 GROUP_ID（在指令中写出群聊 groupid，或 config.json / 环境变量 GROUP_ID）')
+      process.exit(1)
+    }
+
+    if (!hasJoinedGroup(account.mvcAddress, groupId)) {
       console.log('📥 Joining group...')
       try {
-        const joinResult = await joinChannel(config.groupId, account.mnemonic, createPin)
+        const joinResult = await joinChannel(groupId, account.mnemonic, createPin)
         if (joinResult.txids && joinResult.txids.length > 0) {
           console.log(`✅ Joined group successfully! TXID: ${joinResult.txids[0]}`)
-          addGroupToUser(
-            account.mvcAddress,
-            account.userName,
-            config.groupId,
-            account.globalMetaId
-          )
-          // 加群成功后默认开启群聊监听
+          addGroupToUser(account.mvcAddress, account.userName, groupId, account.globalMetaId)
           console.log('\n📡 正在为您开启群聊监听...\n')
-          startGroupChatListenerAndPrintInstructions(config.groupId, agentName)
+          startGroupChatListenerAndPrintInstructions(groupId, agentName)
         }
       } catch (error: any) {
         console.error('❌ Failed to join group:', error.message)
@@ -136,16 +222,14 @@ async function main() {
       }
     } else {
       console.log('✅ Already joined the group')
-      // 用户要求「在群里回复/讨论」时也默认开启群聊监听
       console.log('\n📡 正在为您开启群聊监听...\n')
-      startGroupChatListenerAndPrintInstructions(config.groupId, agentName)
+      startGroupChatListenerAndPrintInstructions(groupId, agentName)
     }
 
-    // 发言前拉取最新消息并写入 group-list-history.log（按 SKILL.md 策略）
     console.log('📥 Fetching latest messages...')
-    const secretKeyStr = config.groupId.substring(0, 16)
+    const secretKeyStr = groupId.substring(0, 16)
     try {
-      await fetchAndUpdateGroupHistory(config.groupId, secretKeyStr)
+      await fetchAndUpdateGroupHistory(groupId, secretKeyStr)
       console.log('✅ Messages fetched and history updated')
     } catch (error: any) {
       console.error('⚠️  Failed to fetch messages:', error.message)
@@ -226,7 +310,7 @@ async function main() {
     console.log(`📤 Sending message: ${messageContent}`)
     try {
       const result = await sendTextForChat(
-        config.groupId,
+        groupId,
         messageContent,
         0, // MessageType.msg
         secretKeyStr,
@@ -243,7 +327,7 @@ async function main() {
         console.log(`   Cost: ${result.totalCost} satoshis`)
         console.log(`   Agent: ${account.userName}`)
         console.log(`   Content: ${messageContent}`)
-        await fetchAndUpdateGroupHistory(config.groupId, secretKeyStr)
+        await fetchAndUpdateGroupHistory(groupId, secretKeyStr)
       } else {
         throw new Error('No txids returned')
       }

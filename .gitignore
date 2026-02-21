@@ -1,6 +1,9 @@
 # macOS
 .DS_Store
 
+# Python
+**/__pycache__/
+
 
 
 # metabot-basic / metabot-chat
@@ -24,14 +27,17 @@ group_chat_listener.log
 unified_chat_listener.log
 topic_pair_chat_poll.log
 
-# 根目录下的敏感文件（account.json、.env、config.json、userInfo.json、group-list-history.log、chat-config、chat-history）
+# 根目录下的敏感/本地文件（不提交到 GitHub）
 account.json
-.env
-.env.local
 config.json
 userInfo.json
-group-list-history.log
 chat-config.json
+group-list-history.log
+*.log
+.env
+.env.local
+.env.example
+.cursorrules
 chat-history/
 agent.md
 agent2.md

@@ -12,11 +12,15 @@ MetaBot 生态的基础设施 Skill。管理 MetaBot 的**身份 (MetaID)**、**
 ### 1. 创建 MetaBot (Identity Creation)
 当用户指令涉及“创建 MetaBot”、“注册 MetaID”、“新建机器人/钱包”时，**必须直接执行**以下脚本。
 
-- **脚本**: `npx ts-node scripts/create_agents.ts [options]`
+- **脚本**: `npx ts-node scripts/create_agents.ts`，**必须**用以下两种方式之一传入 Agent 名称，否则会报错：
+    - **推荐（单个）**: `npx ts-node scripts/create_agents.ts --name "<AgentName>"`  
+      仅创建一个名为 `<AgentName>` 的 MetaBot。`<AgentName>` 为占位，替换为用户要求的名字（如 `xai`、`Alice`）。**不要**把 `--name` 当作名字，只把其后的一个参数当作名字。
+    - **批量**: `npx ts-node scripts/create_agents.ts "<name1>" "<name2>"`  
+      创建多个 MetaBot，每个参数一个名字；参数中**不要**包含 `--name`。
 - **功能**: 生成助记词 -> 派生地址 -> 注册 MetaID (自动申请 Gas 补贴) -> 初始化 `account.json`。
 - **头像选项 (Avatar)**:
     - **自动识别**: 若用户未指定，默认检查 `static/avatar/` 目录下是否有图片。
-    - **指定路径**: `npx ts-node scripts/create_agents.ts --avatar "path/to/image.png"`
+    - **指定路径**: 在名称后加 `--avatar "path/to/image.png"`，例如 `npx ts-node scripts/create_agents.ts --name "MyBot" --avatar "./avatar.png"`。
     - **独立设置**: 若 MetaBot 已存在但需补设头像，执行 `npx ts-node scripts/create_avatar.ts "MetaBotName" "path/to/image.png"`。
 
 ### 2. 资产转账 (Asset Transfer)
@@ -54,7 +58,7 @@ MetaBot 在链上发布基础数据或协议节点。
 
 | 脚本 | 核心功能 | 参数说明 |
 | :--- | :--- | :--- |
-| **`create_agents.ts`** | **创建/注册** | 支持批量创建，支持 `--avatar`。 |
+| **`create_agents.ts`** | **创建/注册** | 单个：`--name "<AgentName>"`；批量：`"<name1>" "<name2>"`；可选 `--avatar "<path>"`。 |
 | `create_avatar.ts` | **头像管理** | `[AgentName] [FilePath]`。限制 < 1MB。 |
 | `create_chatpubkey.ts` | **聊天初始化** | 上链 Chat 公钥，启用加密通讯。 |
 | `send_space.ts` | **MVC 转账** | 交互式或参数调用。单位：Satoshis。 |
@@ -67,6 +71,7 @@ MetaBot 在链上发布基础数据或协议节点。
 ## 行为规范 (AI Constraints)
 
 1.  **执行优先**: 当用户要求“创建一个叫 Alice 的 MetaBot”时，不要返回操作指南，**直接生成并运行**对应的 `create_agents.ts` 命令。
-2.  **路径智能**: 处理头像路径时，若用户提供了 `@引用` AI 需自动将其解析为系统绝对路径传入脚本。
-3.  **余额单位**: 涉及 MVC 转账时，**必须**将用户口语中的 "Space" 转换为 "sats" (乘以 10^8) 传入脚本。
-4.  **带图 Buzz**: 当用户说「将 xx 作为附件发送 buzz」「用 pinid 发送带图 buzz」等时，使用 `send_buzz_with_image.ts`，传入对应 agent、文字内容及 `--image <path>` 或 `--pinid <pinid>`。
+2.  **创建命令格式**: 创建**单个** MetaBot 时**必须**使用 `--name "名字"` 形式，且**只有一个**名字（即 `--name` 后的那一个参数）。例如创建名为 Alice 的 MetaBot：`npx ts-node scripts/create_agents.ts --name "Alice"`。禁止把 `--name` 或其它 `--` 开头的参数当作 Agent 名字。
+3.  **路径智能**: 处理头像路径时，若用户提供了 `@引用` AI 需自动将其解析为系统绝对路径传入脚本。
+4.  **余额单位**: 涉及 MVC 转账时，**必须**将用户口语中的 "Space" 转换为 "sats" (乘以 10^8) 传入脚本。
+5.  **带图 Buzz**: 当用户说「将 xx 作为附件发送 buzz」「用 pinid 发送带图 buzz」等时，使用 `send_buzz_with_image.ts`，传入对应 agent、文字内容及 `--image <path>` 或 `--pinid <pinid>`。

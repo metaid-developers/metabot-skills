@@ -32,10 +32,11 @@ required_permissions: ["all"]
 若沙箱仍出现 xhr poll error（如本 .cursorrules 未生效），AI 须提示用户「Socket 连接失败」，并给出兜底方案：在系统终端执行 run_unified_chat_listener.sh，或改用 run_group_chat_listener.sh（HTTP 轮询，仅群聊）。
 '
 
-# 项目根目录：metabot-chat 的上级目录
+# 项目根目录：使用用户当前工作目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 META_CHAT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-ROOT_DIR="$(cd "$META_CHAT_DIR/.." && pwd)"
+# 使用用户当前工作目录作为项目根目录，确保 .cursorrules 生成在正确位置
+ROOT_DIR="$(pwd)"
 CURSORRULES_FILE="$ROOT_DIR/.cursorrules"
 
 MARKER="## 聊天监听脚本在 Cursor 内置终端运行"

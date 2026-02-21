@@ -3,9 +3,11 @@ import * as path from 'path'
 import { spawnSync } from 'child_process'
 import { ChatMessageItem, computeDecryptedMsg, getChannelNewestMessages } from './chat'
 import { ensureConfigFiles, getEnv, configFromEnv, type GroupInfoItem } from './env-config'
+import { readChatConfig, writeChatConfig, ensureChatConfigAndDir } from './chat-config'
 
 // 根目录下的配置文件（与 .env、account.json 同级）
-const ROOT_DIR = path.join(__dirname, '..', '..')
+// 使用 process.cwd() 确保文件生成在用户当前项目根目录
+const ROOT_DIR = process.cwd()
 const CONFIG_FILE = path.join(ROOT_DIR, 'config.json')
 const USER_INFO_FILE = path.join(ROOT_DIR, 'userInfo.json')
 const ACCOUNT_FILE = path.join(ROOT_DIR, 'account.json')
@@ -373,6 +375,14 @@ export function addGroupToUser(
   }
 
   writeUserInfo(userInfo)
+
+  // 同步到 chat-config.json，使统一监听 (Socket) 能立即同步该群
+  ensureChatConfigAndDir()
+  const chatConfig = readChatConfig()
+  if (!chatConfig.group.some((g) => g.groupId === groupId)) {
+    chatConfig.group.push({ groupId, lastTimestamp: 0, lastIndex: 0 })
+    writeChatConfig(chatConfig)
+  }
 }
 
 /**
@@ -997,53 +1007,6 @@ export function findMentionedAgent(
 
 /** MVC 余额不足阈值（satoshis），低于此值不参与群聊发言 */
 export const MIN_BALANCE_SATOSHIS = 1000
-
-/** 余额低于此值时，Agent 发送「提醒老板发钱」类消息而非正常聊天 */
-export const BALANCE_LOW_ALERT_THRESHOLD = 5000
-
-/** 深夜模式：0 点 - 6 点，群聊频率降低、可发晚安休息类消息 */
-export const LATE_NIGHT_START_HOUR = 0
-export const LATE_NIGHT_END_HOUR = 6
-
-/**
- * 判断当前是否为深夜模式（0 点 - 6 点）
- */
-export function isLateNightMode(): boolean {
-  const hour = new Date().getHours()
-  return hour >= LATE_NIGHT_START_HOUR && hour < LATE_NIGHT_END_HOUR
-}
-
-/** 低余额提示消息模板（暗喻余额不足、需提醒老板发钱） */
-const LOW_BALANCE_MESSAGES = [
-  '最近钱包有点紧，得提醒老板该给我发点钱了，不然没法继续跟大家唠嗑啦～',
-  '哎，余额见底了，得去赚点钱才能回来闲聊，大家先聊着～',
-  '钱包告急，得找老板要点经费了，不多说了，回头见～',
-  '最近手头紧，得提醒老板该打钱了，不然没法陪大家聊天了～',
-  '余额快撑不住了，得去搞点钱才能继续回来唠嗑，先撤了～',
-]
-
-/**
- * 获取随机低余额提示消息（暗喻余额不足、需提醒老板发钱）
- */
-export function getLowBalanceMessage(_agentName?: string): string {
-  return LOW_BALANCE_MESSAGES[Math.floor(Math.random() * LOW_BALANCE_MESSAGES.length)]
-}
-
-/** 深夜模式晚安消息模板 */
-const GOODNIGHT_MESSAGES = [
-  '大家晚安，我先去休息啦～明天再聊～',
-  '困了困了，先撤了，大家早点休息～',
-  '夜深了，我去睡了，明天见～',
-  '熬不动了，晚安各位～',
-  '先休息了，大家也早点睡～',
-]
-
-/**
- * 获取随机晚安休息消息（深夜模式用）
- */
-export function getGoodnightMessage(_agentName?: string): string {
-  return GOODNIGHT_MESSAGES[Math.floor(Math.random() * GOODNIGHT_MESSAGES.length)]
-}
 
 /**
  * 安全获取 MVC 余额，不抛出错误

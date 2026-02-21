@@ -2,16 +2,17 @@
 
 /**
  * 环境变量与配置初始化
- * - 从 .env / .env.local 加载配置
- * - 缺失时自动生成 .env.example、userInfo.json、config.json 模板
- * - 校验必填字段，未填写时提示用户
+ * - 若存在 .env / .env.local 则加载（可选）；不存在也不创建 .env.example，不退出
+ * - LLM 配置仅由 account.json 提供，不在此处校验
+ * - 缺失时仅自动创建 userInfo.json、config.json 模板（config 可从 process.env 填充）
  */
 
 import * as fs from 'fs'
 import * as path from 'path'
 
 // 根目录（MetaApp-Skill），与 account.json 同级
-const ROOT_DIR = path.join(__dirname, '..', '..')
+// 使用 process.cwd() 确保配置文件在用户项目根目录
+const ROOT_DIR = process.cwd()
 const ENV_FILE = path.join(ROOT_DIR, '.env')
 const ENV_LOCAL_FILE = path.join(ROOT_DIR, '.env.local')
 const ENV_EXAMPLE_FILE = path.join(ROOT_DIR, '.env.example')
@@ -264,25 +265,11 @@ function migrateFromOldLocations(): void {
 }
 
 /**
- * 确保所有必要文件存在，缺失时自动创建
- * 若 .env 和 .env.local 均不存在，创建 .env.example 并提示用户
- * @returns 是否通过了校验（未通过会 process.exit）
+ * 确保 config.json、userInfo.json 存在，缺失时自动创建
+ * 不依赖 .env 存在，不创建 .env.example；GROUP_ID/LLM 由各脚本在运行时从 config.json 或 account.json 读取并校验
  */
 export function ensureConfigFiles(): void {
   migrateFromOldLocations()
-
-  const envExists = fs.existsSync(ENV_FILE)
-  const envLocalExists = fs.existsSync(ENV_LOCAL_FILE)
-
-  if (!envExists && !envLocalExists) {
-    createEnvExample()
-    console.error('\n❌ 未找到 .env 或 .env.local 文件（根目录）')
-    console.error('   已自动创建根目录 .env.example，请复制为 .env 或 .env.local 后填写配置：')
-    console.error('   cp .env.example .env')
-    console.error('\n   必填项：GROUP_ID、LLM_API_KEY（或 DEEPSEEK_API_KEY 等）')
-    console.error('   参考: metabot-chat/SKILL.md（配置文件位于项目根目录）\n')
-    process.exit(1)
-  }
 
   const env = loadEnv()
 
@@ -293,10 +280,8 @@ export function ensureConfigFiles(): void {
 
   if (!fs.existsSync(CONFIG_FILE)) {
     createConfigFromEnv(env)
-    console.log('📄 已从 .env 创建 config.json（根目录）')
+    console.log('📄 已创建 config.json（根目录），GROUP_ID 可从 config.json 或环境变量传入')
   }
-
-  validateAndExit(env)
 }
 
 /**

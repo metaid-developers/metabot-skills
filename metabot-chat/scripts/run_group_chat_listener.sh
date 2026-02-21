@@ -8,14 +8,15 @@
 #       不传 agent_name 或加 --all-agents：所有群内 Agent 参与（被 @ 优先）
 #       加 --discussion：对最新消息进行话题讨论（多 Agent 轮流发言，优先被 @ 的开场）
 #       可选: --no-open 在当前终端后台启动（不新开系统终端）
-# 示例: ./run_group_chat_listener.sh "AI Eason"        # 仅 AI Eason 回复
+# 示例: ./run_group_chat_listener.sh "<agent_name>"    # 仅指定 Agent 回复
 #       ./run_group_chat_listener.sh --all-agents       # 所有 Agent 监听并回复
 #       ./run_group_chat_listener.sh --all-agents --discussion  # 监听并对最新消息话题讨论
 
 cd "$(dirname "$0")/.."
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CHAT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# 使用用户当前工作目录作为项目根目录，确保配置文件生成在正确位置
+ROOT_DIR="$(pwd)"
 LISTENER_PID_FILE="$ROOT_DIR/.group_chat_listener.pid"
 
 # 解析参数：支持 --no-open、--all-agents、--discussion

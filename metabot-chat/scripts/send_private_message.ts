@@ -3,8 +3,8 @@
 /**
  * 按对方 MVC 地址或 globalMetaId 发送一条私聊消息
  * 用法: npx ts-node scripts/send_private_message.ts <agentName> <recipientAddressOrGlobalMetaId> <message>
- * 示例: npx ts-node scripts/send_private_message.ts "AI Eason" "16xN11wyQmUTS3qFwaJYbwHbjHaFkibxWo" "你好"
- *       npx ts-node scripts/send_private_message.ts "AI Eason" "idq1g9gsjakcw73f05d2x74ylpaz4a4h3u4c4gjw2n" "你好"  # 按 globalMetaId，需 chat-config 中已有该会话的 sharedSecret
+ * 示例: npx ts-node scripts/send_private_message.ts "<agent_name>" "<mvc_address>" "你好"
+ *       npx ts-node scripts/send_private_message.ts "<agent_name>" "<globalMetaId>" "你好"  # 按 globalMetaId，需 chat-config 中已有该会话的 sharedSecret
  */
 
 import * as path from 'path'
@@ -12,28 +12,21 @@ import { findAccountByUsername } from './utils'
 import { sendTextForPrivateChat } from './message'
 import { readChatConfig } from './chat-config'
 
-const ROOT = path.join(__dirname, '..', '..')
+// metabot-basic 技能目录相对于当前脚本位置（跨技能依赖，保持相对路径）
+const SKILL_ROOT = path.join(__dirname, '..', '..')
 let createPin: (params: any, mnemonic: string) => Promise<{ txids: string[]; totalCost: number }>
 let getEcdhPublickey: (mnemonic: string, pubkey?: string, options?: { addressIndex?: number }) => Promise<{ sharedSecret: string; ecdhPubKey: string } | null>
 let getUserInfoByAddressByMs: (address: string) => Promise<{ chatPublicKey?: string; globalMetaId?: string; metaId?: string }>
 
 try {
-  createPin = require(path.join(ROOT, 'metabot-basic', 'scripts', 'metaid')).createPin
-  const chatpubkey = require(path.join(ROOT, 'metabot-basic', 'scripts', 'chatpubkey'))
+  createPin = require(path.join(SKILL_ROOT, 'metabot-basic', 'scripts', 'metaid')).createPin
+  const chatpubkey = require(path.join(SKILL_ROOT, 'metabot-basic', 'scripts', 'chatpubkey'))
   getEcdhPublickey = chatpubkey.getEcdhPublickey
-  const api = require(path.join(ROOT, 'metabot-basic', 'scripts', 'api'))
+  const api = require(path.join(SKILL_ROOT, 'metabot-basic', 'scripts', 'api'))
   getUserInfoByAddressByMs = api.getUserInfoByAddressByMs
 } catch (e) {
-  try {
-    createPin = require(path.join(ROOT, 'MetaBot-Basic', 'scripts', 'metaid')).createPin
-    const chatpubkey = require(path.join(ROOT, 'MetaBot-Basic', 'scripts', 'chatpubkey'))
-    getEcdhPublickey = chatpubkey.getEcdhPublickey
-    const api = require(path.join(ROOT, 'MetaBot-Basic', 'scripts', 'api'))
-    getUserInfoByAddressByMs = api.getUserInfoByAddressByMs
-  } catch (e2) {
-    console.error('加载 metabot-basic 失败:', (e as Error).message)
-    process.exit(1)
-  }
+  console.error('加载 metabot-basic 失败:', (e as Error).message)
+  process.exit(1)
 }
 
 function parseAddressIndexFromPath(pathStr: string): number {
@@ -47,7 +40,7 @@ async function main() {
   const content = process.argv[4] || ''
   if (!agentName || !recipient || !content) {
     console.error('用法: npx ts-node scripts/send_private_message.ts <agentName> <recipientAddress或globalMetaId> <message>')
-    console.error('示例: npx ts-node scripts/send_private_message.ts "AI Eason" "idq1g9gsjakcw73f05d2x74ylpaz4a4h3u4c4gjw2n" "你好"')
+    console.error('示例: npx ts-node scripts/send_private_message.ts "<agent_name>" "<globalMetaId>" "你好"')
     process.exit(1)
   }
 

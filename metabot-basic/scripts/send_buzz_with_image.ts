@@ -17,9 +17,11 @@ import { parseAddressIndexFromPath } from './wallet'
 import { readAccountFile, findAccountByKeyword } from './utils'
 
 const SCRIPT_DIR = __dirname
-const ROOT_DIR = path.join(SCRIPT_DIR, '..', '..')
+// 使用 process.cwd() 确保配置文件在用户项目根目录
+const ROOT_DIR = process.cwd()
 const ACCOUNT_FILE = path.join(ROOT_DIR, 'account.json')
-const METABOT_FILE_DIR = path.join(ROOT_DIR, 'metabot-file')
+// metabot-file 技能目录相对于当前脚本位置
+const METABOT_FILE_DIR = path.join(SCRIPT_DIR, '..', '..', 'metabot-file')
 
 function getContentTypeFromExt(ext: string): string {
   const map: Record<string, string> = {

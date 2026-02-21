@@ -15,9 +15,15 @@ import { readAccountFile, findAccountByKeyword } from './utils'
 
 async function main() {
   const args = process.argv.slice(2)
-  const agentName = args[0] || 'AI Eason'
-  let content: string
+  const agentName = args[0]
+  if (!agentName) {
+    console.error('❌ 请提供 Agent 名称和 Buzz 内容')
+    console.error('   Usage: npx ts-node scripts/send_buzz.ts "<agent_name>" "内容"')
+    console.error('   或:    npx ts-node scripts/send_buzz.ts "<agent_name>" @./content.txt')
+    process.exit(1)
+  }
 
+  let content: string
   if (args[1]?.startsWith('@')) {
     const filePath = args[1].slice(1)
     const fullPath = path.isAbsolute(filePath) ? filePath : path.join(process.cwd(), filePath)
@@ -32,8 +38,8 @@ async function main() {
 
   if (!content) {
     console.error('❌ 请提供 Buzz 内容')
-    console.error('   Usage: npx ts-node scripts/send_buzz.ts "AI Eason" "内容"')
-    console.error('   或:    npx ts-node scripts/send_buzz.ts "AI Eason" @./content.txt')
+    console.error('   Usage: npx ts-node scripts/send_buzz.ts "<agent_name>" "内容"')
+    console.error('   或:    npx ts-node scripts/send_buzz.ts "<agent_name>" @./content.txt')
     process.exit(1)
   }
 

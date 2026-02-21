@@ -11,12 +11,12 @@ import { readAccountFile, findAccountByKeyword } from './utils'
 
 async function main() {
   const args = process.argv.slice(2)
-  const agentName = args[0] || 'AI Eason'
+  const agentName = args[0]
   const pinId = args[1]?.trim()
 
-  if (!pinId) {
-    console.error('❌ 请提供要点赞的 pinId')
-    console.error('   Usage: npx ts-node scripts/send_like.ts "AI Eason" <pinId>')
+  if (!agentName || !pinId) {
+    console.error('❌ 请提供 Agent 名称和要点赞的 pinId')
+    console.error('   Usage: npx ts-node scripts/send_like.ts "<agent_name>" <pinId>')
     process.exit(1)
   }
 

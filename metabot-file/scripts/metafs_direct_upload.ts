@@ -2,7 +2,7 @@
 /**
  * 小文件直接上链：构建并签名基础交易(SIGHASH_SINGLE|ANYONECANPAY)，再调用 DirectUpload API。
  * 运行: 在 metabot-file 目录下
- *   npx ts-node scripts/metafs_direct_upload.ts --account-file ../../../account.json --file /path/to/file.txt [--path /file] [--keyword "AI Eason"]
+ *   npx ts-node scripts/metafs_direct_upload.ts --account-file ../../../account.json --file /path/to/file.txt [--path /file] [--keyword "<agent_name>"]
  */
 
 import * as fs from 'fs'

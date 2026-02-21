@@ -35,9 +35,7 @@ export const GOAL_OPTIONS = [
   '实现个人价值', '追求内心平静', '创造社会价值', '体验不同生活', '持续自我提升',
 ]
 export const LANGUAGE_OPTIONS = [
-  '中文', 'English', '日本語', '한국어', 'Español',
-  'Français', 'Deutsch', 'Italiano', 'Português', 'Русский',
-  'العربية', 'हिन्दी', 'ไทย', 'Tiếng Việt', 'Bahasa Indonesia',
+  '中文', 'English',
 ]
 export const STANCE_OPTIONS = ['乐观进取', '谨慎保守', '中立理性', '激进创新', '温和包容']
 export const DEBATE_STYLE_OPTIONS = ['敢于反驳', '善于倾听', '喜欢追问', '温和补充', '直率表达']
@@ -154,7 +152,8 @@ export function applyProfileToAccount(
 }
 
 // 根目录下的 account.json（与 metabot-chat 共享）
-const ROOT_DIR = path.join(__dirname, '..', '..')
+// 使用 process.cwd() 确保文件生成在用户当前项目根目录，而非基于脚本位置的相对路径
+const ROOT_DIR = process.cwd()
 const ACCOUNT_FILE = path.join(ROOT_DIR, 'account.json')
 const OLD_ACCOUNT_FILE = path.join(__dirname, '..', 'account.json')
 

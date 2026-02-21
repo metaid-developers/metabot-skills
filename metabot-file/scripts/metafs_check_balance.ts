@@ -4,7 +4,7 @@
  * 输出 JSON 与 upload_with_balance_check.sh 解析格式兼容。
  *
  * 运行: 在 metabot-file 目录下
- *   npx ts-node scripts/metafs_check_balance.ts [--keyword "AI Eason"] [--account-index 0] [--account-file path] [--file-size-mb 1.5] --json
+ *   npx ts-node scripts/metafs_check_balance.ts [--keyword "<agent_name>"] [--account-index 0] [--account-file path] [--file-size-mb 1.5] --json
  */
 
 import * as fs from 'fs'

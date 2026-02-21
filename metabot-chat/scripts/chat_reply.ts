@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 /**
- * 🤖MetaBot 畅聊群 智能回复
+ * 群聊智能回复
  * 根据最近30条群聊记录：
- * - 若有人提及 metabot-basic → 重点回复该人
+ * - 若有人 @提及本 Agent → 重点回复该人
  * - 若无提及 → 日常聊天，自然回复，不刻意展开话题
  */
 
@@ -22,11 +22,6 @@ import {
   getEnrichedUserProfile,
   getAgentsInGroup,
   filterAgentsWithBalance,
-  getMvcBalanceSafe,
-  BALANCE_LOW_ALERT_THRESHOLD,
-  getLowBalanceMessage,
-  isLateNightMode,
-  getGoodnightMessage,
   stripLeadingSelfMention,
 } from './utils'
 import { generateChatReply, getResolvedLLMConfig } from './llm'
@@ -42,16 +37,10 @@ try {
   process.exit(1)
 }
 
-/** 默认群 ID，优先使用 readConfig().groupId */
-const DEFAULT_GROUP_ID = 'c1d5c0c7c4430283b3155b25d59d98ba95b941d9bfc3542bf89ba56952058f85i0'
-const METABOT_BASIC_KEYWORDS = ['metabot-basic', 'MetaBot', 'metabot-basic', 'MetaBotBasic']
+/** 群 ID 必须从 config.json 或环境变量读取，不提供默认值 */
+const DEFAULT_GROUP_ID = ''
 
-function containsMetaIDAgent(text: string): boolean {
-  const lower = (text || '').toLowerCase()
-  return METABOT_BASIC_KEYWORDS.some((k) => lower.includes(k.toLowerCase()))
-}
-
-/** 检测消息中是否 @提及 了某 metabot-basic，返回被提及的 Agent 名（取最近一条） */
+/** 检测消息中是否 @提及 了某 Agent，返回被提及的 Agent 名（取最近一条） */
 function findMentionedAgent(entries: { content: string; userInfo?: { name?: string } }[], agentNames: string[]): string | null {
   for (let i = entries.length - 1; i >= 0; i--) {
     const content = (entries[i].content || '').trim()
@@ -76,7 +65,7 @@ function pickRandomAgent(agents: string[]): string {
 }
 
 async function main() {
-  // 优先从环境变量读取（避免 spawn shell 将 "AI Eason" 拆成 argv[2]="AI" argv[3]="Eason"）
+  // 优先从环境变量读取（避免 spawn shell 将带空格的名称拆成多个 argv）
   const specifiedAgent = (process.env.AGENT_NAME || process.argv[2])?.trim()
 
   const config = readConfig()
@@ -95,16 +84,14 @@ async function main() {
     }
   }
   if (!GROUP_ID) {
-    GROUP_ID = (config.groupId || DEFAULT_GROUP_ID).trim()
+    GROUP_ID = (config.groupId || '').trim()
+  }
+  if (!GROUP_ID) {
+    console.error('❌ GROUP_ID 未配置，请在 config.json 中设置 groupId 或通过环境变量 GROUP_ID 传入')
+    process.exit(1)
   }
   config.groupId = GROUP_ID
   writeConfig(config)
-
-  const defaultLlm = getResolvedLLMConfig(undefined, config)
-  if (!defaultLlm.apiKey) {
-    console.error('❌ 请配置 .env 中 DEEPSEEK_API_KEY / GEMINI_API_KEY 等或 account.json/config.json llm')
-    process.exit(1)
-  }
 
   const secretKeyStr = GROUP_ID.substring(0, 16)
   await fetchAndUpdateGroupHistory(GROUP_ID, secretKeyStr)
@@ -136,7 +123,7 @@ async function main() {
     return
   }
 
-  // 优先检测 @提及某 Agent：若有人 @小橙、@Nova 等，由被提及的 Agent 回复
+  // 优先检测 @提及某 Agent：若有人 @某Agent，由被提及的 Agent 回复
   const mentionedAgent = findMentionedAgent(entries, agents)
   let agentName: string
   if (specifiedAgent) {
@@ -158,12 +145,9 @@ async function main() {
     }
   }
 
-  const mentionEntry = [...entries].reverse().find((e) => containsMetaIDAgent(e.content))
-  const hasMetaIDMention = !!mentionEntry
-  let mentionTargetName = mentionEntry?.userInfo?.name
-  let mentionTargetContent = mentionEntry?.content
-
   // 若有人 @提及了某 Agent，该 Agent 应回复提及者
+  let mentionTargetName: string | undefined
+  let mentionTargetContent: string | undefined
   if (mentionedAgent) {
     const whoMentioned = [...entries].reverse().find((e) => {
       const c = (e.content || '').trim()
@@ -175,7 +159,7 @@ async function main() {
     }
   }
 
-  const hasMention = hasMetaIDMention || !!mentionedAgent
+  const hasMention = !!mentionedAgent
   const account = findAccountByUsername(agentName)
   if (!account) {
     console.error(`❌ 未找到账户: ${agentName}`)
@@ -183,6 +167,10 @@ async function main() {
   }
 
   const llmConfig = getResolvedLLMConfig(account, config)
+  if (!llmConfig.apiKey) {
+    console.error(`❌ 请在 account.json 中为账户 ${agentName} 配置 llm（含 apiKey）`)
+    process.exit(1)
+  }
 
   // 禁止自己回复自己：若最新一条消息来自本 Agent，跳过本次回复
   if (entries.length > 0) {
@@ -207,62 +195,48 @@ async function main() {
   const userProfile = userInfo.userList.find((u: any) => u.address === account.mvcAddress)
   const enrichedProfile = getEnrichedUserProfile(userProfile, account)
 
-  // 边界能力 1：余额低于 5000 时，发送「提醒老板发钱」类消息
-  const balance = await getMvcBalanceSafe(account.mvcAddress)
-  const useLowBalanceMessage = balance !== null && balance < BALANCE_LOW_ALERT_THRESHOLD
-  const useGoodnightMessage = !useLowBalanceMessage && isLateNightMode() && Math.random() < 0.3
-
   console.log(`📋 最近 ${recentMessages.length} 条消息`)
   if (mentionedAgent) {
     console.log(`   ✅ 检测到 @${mentionedAgent}，由 ${agentName} 回复 ${mentionTargetName || '提及者'}`)
-  } else if (hasMetaIDMention) {
-    console.log(`   ✅ 检测到提及 MetaBot，由 ${mentionTargetName} 发起`)
   } else {
-    console.log(`   ℹ️  无提及，随机选择 Agent 进行日常聊天`)
+    console.log(`   ℹ️  无 @提及，随机选择 Agent 进行日常聊天`)
   }
   console.log(`🤖 回复者: ${agentName}`)
-  if (useLowBalanceMessage) {
-    console.log(`   💰 余额不足 (${balance} < ${BALANCE_LOW_ALERT_THRESHOLD})，发送低余额提示消息`)
-  }
-  if (useGoodnightMessage) {
-    console.log(`   🌙 深夜模式，发送晚安休息消息`)
-  }
 
-  let content: string
-  let mentionName: string | undefined
-
-  if (useLowBalanceMessage) {
-    content = getLowBalanceMessage(agentName)
+  // 使用 LLM 生成回复
+  const result = await generateChatReply(
+    agentName,
+    recentMessages,
+    enrichedProfile,
+    {
+      hasMetaIDAgentMention: hasMention,
+      mentionTargetName: mentionTargetName || undefined,
+      mentionTargetContent: mentionTargetContent || undefined,
+    },
+    llmConfig
+  )
+  let content = result.content
+  let mentionName = result.mentionName
+  // 禁止 @自己：若 LLM 返回 @ 的是自己，清除 mention 并去掉内容中的 @自己
+  if (mentionName && mentionName.trim().toLowerCase() === agentName.trim().toLowerCase()) {
     mentionName = undefined
-  } else if (useGoodnightMessage) {
-    content = getGoodnightMessage(agentName)
-    mentionName = undefined
-  } else {
-    const result = await generateChatReply(
-      agentName,
-      recentMessages,
-      enrichedProfile,
-      {
-        hasMetaIDAgentMention: hasMention,
-        mentionTargetName: mentionTargetName || undefined,
-        mentionTargetContent: mentionTargetContent || undefined,
-      },
-      llmConfig
-    )
-    content = result.content
-    mentionName = result.mentionName
-    // 禁止 @自己：若 LLM 返回 @ 的是自己，清除 mention 并去掉内容中的 @自己
-    if (mentionName && mentionName.trim().toLowerCase() === agentName.trim().toLowerCase()) {
-      mentionName = undefined
-      content = stripLeadingSelfMention(content, agentName)
-    }
+    content = stripLeadingSelfMention(content, agentName)
   }
 
   let reply: import('./chat').ChatMessageItem | null = null
   let mentions: import('./message').Mention[] = []
   const targetName = mentionName || (hasMention ? mentionTargetName : undefined)
+  
+  // 找到最新一条非自己发送的消息作为回复引用（触发本次回复的消息）
+  const latestIncomingEntry = [...entries].reverse().find((e) => {
+    const speakerName = (e.userInfo?.name || '').trim().toLowerCase()
+    const isSelf = speakerName === agentName.trim().toLowerCase() || e.address === account.mvcAddress
+    return !isSelf
+  })
+  
   if (targetName) {
-    const targetEntry = entries.find(
+    // 优先找该目标用户的最新消息（从后往前找）
+    const targetEntry = [...entries].reverse().find(
       (e) => (e.userInfo?.name || '').trim().toLowerCase() === targetName.trim().toLowerCase()
     )
     if (targetEntry) {
@@ -279,6 +253,9 @@ async function main() {
         })
       }
     }
+  } else if (latestIncomingEntry) {
+    // 无特定目标时，回复最新一条非自己的消息
+    reply = { txId: latestIncomingEntry.txId } as import('./chat').ChatMessageItem
   }
 
   console.log(`\n💬 回复内容:\n   ${content}\n`)

@@ -37,19 +37,23 @@ import {
 } from './chat'
 import { findAccountByUsername, getAvailableUserNames, readUserInfo } from './utils'
 
-const ROOT_DIR = path.join(__dirname, '..', '..')
+// 使用 process.cwd() 确保配置文件在用户项目根目录
+const ROOT_DIR = process.cwd()
 const ACCOUNT_FILE = path.join(ROOT_DIR, 'account.json')
+
+// MetaBot-Basic 技能目录相对于当前脚本位置
+const METABOT_BASIC_DIR = path.join(__dirname, '..', '..', 'metabot-basic')
 
 let getEcdhPublickey: (mnemonic: string, pubkey?: string, options?: { addressIndex?: number }) => Promise<{ sharedSecret: string } | null>
 let getUserInfoByMetaidByMs: (metaid: string) => Promise<{ chatPublicKey?: string }>
 try {
-  const chatpubkey = require(path.join(__dirname, '..', '..', 'MetaBot-Basic', 'scripts', 'chatpubkey'))
+  const chatpubkey = require(path.join(METABOT_BASIC_DIR, 'scripts', 'chatpubkey'))
   getEcdhPublickey = chatpubkey.getEcdhPublickey
 } catch {
   getEcdhPublickey = async () => null
 }
 try {
-  const api = require(path.join(__dirname, '..', '..', 'MetaBot-Basic', 'scripts', 'api'))
+  const api = require(path.join(METABOT_BASIC_DIR, 'scripts', 'api'))
   getUserInfoByMetaidByMs = api.getUserInfoByMetaidByMs
 } catch {
   getUserInfoByMetaidByMs = async () => ({})
@@ -65,7 +69,7 @@ function getAccountWithPath(agentName: string): { mnemonic: string; globalMetaId
     )
     if (!account?.mnemonic) return null
     const pathStr = account.path || "m/44'/10001'/0'/0/0"
-    const wallet = require(path.join(__dirname, '..', '..', 'MetaBot-Basic', 'scripts', 'wallet'))
+    const wallet = require(path.join(METABOT_BASIC_DIR, 'scripts', 'wallet'))
     const addressIndex = wallet.parseAddressIndexFromPath ? wallet.parseAddressIndexFromPath(pathStr) : 0
     return {
       mnemonic: account.mnemonic,
@@ -354,10 +358,27 @@ async function main() {
   /** 同一会话同时只允许一个回复任务，避免并发导致连续发两条相同内容 */
   const inFlightPrivateReply = new Set<string>()
 
-  const maybeTriggerReply = (kind: 'group' | 'private', groupId?: string, otherGlobalMetaId?: string, incomingPinId?: string) => {
+  const maybeTriggerReply = (kind: 'group' | 'private', groupId?: string, otherGlobalMetaId?: string, incomingPinId?: string, incomingContent?: string, replyInfo?: any) => {
     if (process.env.AUTO_REPLY !== '1' && process.env.AUTO_REPLY !== 'true') return
     /** 仅私聊回复：REPLY_PRIVATE_ONLY=1 时不触发群聊回复 */
     if (process.env.REPLY_PRIVATE_ONLY === '1' && kind === 'group') return
+    /** 仅提及回复：REPLY_ONLY_MENTION=1 时，群聊只回复 @提及当前 Agent 或回复当前 Agent 消息的情况 */
+    if (process.env.REPLY_ONLY_MENTION === '1' && kind === 'group') {
+      const content = (incomingContent || '').trim()
+      const mentionPattern = new RegExp(`@${agentName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$|[，。！？、])`, 'i')
+      const isMentioned = mentionPattern.test(content)
+      const isReplyToSelf = replyInfo && (
+        (replyInfo.userInfo?.name || '').trim().toLowerCase() === agentName.trim().toLowerCase() ||
+        replyInfo.globalMetaId === selfGlobalMetaId ||
+        replyInfo.metaId === selfGlobalMetaId
+      )
+      if (!isMentioned && !isReplyToSelf) {
+        console.log(`[群聊回复] 跳过：消息未 @${agentName} 且未回复本 Agent（REPLY_ONLY_MENTION=1）`)
+        return
+      }
+      if (isMentioned) console.log(`[群聊回复] 检测到 @${agentName}，触发回复`)
+      if (isReplyToSelf) console.log(`[群聊回复] 检测到回复本 Agent 的消息，触发回复`)
+    }
     if (replyCount >= REPLY_MAX) {
       if (replyCount === REPLY_MAX) {
         console.log(`\n⚠️ 自动回复策略 ${REPLY_MAX} 次已完成，如需继续请输入相关指令或重新设置 REPLY_MAX_COUNT。\n`)
@@ -546,7 +567,7 @@ async function main() {
       }
       writeChatConfig(config)
       console.log(`[Socket 推送] 📩 群聊 [${groupId.slice(0, 8)}…] ${(message.userInfo as any)?.name || message.address}: ${content.slice(0, 50)}`)
-      maybeTriggerReply('group', groupId)
+      maybeTriggerReply('group', groupId, undefined, pinId, content, message.replyInfo)
     }
   }
 

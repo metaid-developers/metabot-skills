@@ -60,11 +60,13 @@ function acquirePrivateReplyLock(agentName: string, otherGlobalMetaId: string): 
 let createPin: any = null
 let getEcdhPublickey: (mnemonic: string, pubkey?: string, options?: { addressIndex?: number }) => Promise<{ sharedSecret: string } | null>
 let getUserInfoByMetaidByMs: (metaid: string) => Promise<{ chatPublicKey?: string }>
+// metabot-basic 技能目录相对于当前脚本位置（跨技能依赖）
+const METABOT_BASIC_DIR = path.join(__dirname, '..', '..', 'metabot-basic')
 try {
-  createPin = require(path.join(__dirname, '..', '..', 'MetaBot-Basic', 'scripts', 'metaid')).createPin
-  const chatpubkey = require(path.join(__dirname, '..', '..', 'MetaBot-Basic', 'scripts', 'chatpubkey'))
+  createPin = require(path.join(METABOT_BASIC_DIR, 'scripts', 'metaid')).createPin
+  const chatpubkey = require(path.join(METABOT_BASIC_DIR, 'scripts', 'chatpubkey'))
   getEcdhPublickey = chatpubkey.getEcdhPublickey
-  const api = require(path.join(__dirname, '..', '..', 'MetaBot-Basic', 'scripts', 'api'))
+  const api = require(path.join(METABOT_BASIC_DIR, 'scripts', 'api'))
   getUserInfoByMetaidByMs = api.getUserInfoByMetaidByMs
 } catch (e) {
   console.error('加载 metabot-basic 失败:', (e as Error).message)
@@ -124,8 +126,8 @@ async function mainWork(agentName: string, otherGlobalMetaId: string) {
 
   const llmConfig = getResolvedLLMConfig(account, config)
   if (!llmConfig.apiKey) {
-    console.error('请配置 LLM API Key')
-    throw new Error('LLM API Key not configured')
+    console.error(`❌ 请在 account.json 中为账户 ${agentName} 配置 llm（含 apiKey）`)
+    throw new Error('account.json 中缺少 llm.apiKey 配置')
   }
 
   const userProfile = {
@@ -148,19 +150,23 @@ async function mainWork(agentName: string, otherGlobalMetaId: string) {
     return
   }
 
+  // 找到最新一条非自己发送的消息作为回复引用（触发本次回复的消息）
+  const latestIncomingEntry = [...entries].reverse().find((e) => e.globalMetaId !== selfGlobalMetaId)
+  const replyTarget = latestIncomingEntry?.txId ? { txId: latestIncomingEntry.txId } as any : null
+
   try {
     await sendTextForPrivateChat(
       otherGlobalMetaId,
       result.content,
       0,
       sharedSecret,
-      null,
+      replyTarget,
       [],
       account.userName,
       account.mnemonic,
       createPin
     )
-    console.log('✅ 私聊回复已发送')
+    console.log('✅ 私聊回复已发送' + (replyTarget ? `（引用消息: ${replyTarget.txId.slice(0, 8)}...）` : ''))
   } catch (e: any) {
     console.error('发送失败:', e?.message || e)
     throw e

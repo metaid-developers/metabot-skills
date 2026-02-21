@@ -315,14 +315,39 @@ export async function createAgent(
 
 async function main() {
   const args = process.argv.slice(2)
+
+  // --avatar <path>: 可选头像路径
   const avatarIdx = args.indexOf('--avatar')
   const avatarFilePath =
     avatarIdx >= 0 && args[avatarIdx + 1] ? args[avatarIdx + 1] : undefined
-  const agents =
-    avatarIdx >= 0
-      ? args.filter((a, i) => a !== '--avatar' && (i < avatarIdx || i > avatarIdx + 1))
-      : args
-  const agentList = agents.length > 0 ? agents : ['小橙', 'Nova', '墨白']
+
+  // --name <agent_name>: 明确指定「单个」Agent 名称，避免 AI 把 --name 当成名字创建
+  const nameIdx = args.indexOf('--name')
+  let agentList: string[]
+  if (nameIdx >= 0 && args[nameIdx + 1] != null) {
+    const singleName = args[nameIdx + 1].trim()
+    if (!singleName) {
+      console.error('❌ --name 后必须跟一个非空的 Agent 名称')
+      process.exit(1)
+    }
+    agentList = [singleName]
+  } else {
+    // 无 --name 时：除 --avatar 及其值外，其余参数均为 Agent 名称（支持批量）
+    agentList =
+      avatarIdx >= 0
+        ? args.filter((a, i) => a !== '--avatar' && (i < avatarIdx || i > avatarIdx + 1))
+        : args
+    // 过滤掉未识别的 --xxx 标志，避免被当成名字（如误传 --name 但无值时）
+    agentList = agentList.filter((a) => !/^--/.test(a))
+  }
+
+  if (agentList.length === 0) {
+    console.error('❌ 请提供要创建的 Agent 名称')
+    console.error('   用法（单个）: npx ts-node scripts/create_agents.ts --name "<agent_name>"')
+    console.error('   用法（批量）: npx ts-node scripts/create_agents.ts "<name1>" "<name2>" ...')
+    console.error('   示例: npx ts-node scripts/create_agents.ts --name "MyAgent" [--avatar "./avatar.png"]')
+    process.exit(1)
+  }
 
   console.log('🎯 开始批量创建 MetaID Agents')
   console.log(`📋 将创建以下 Agents: ${agentList.join(', ')}`)

@@ -16,7 +16,6 @@
 import {
   readConfig,
   writeConfig,
-  isLateNightMode,
   fetchAndUpdateGroupHistory,
   migrateUserInfoProfileToAccount,
   getAgentsInGroup,
@@ -39,17 +38,8 @@ try {
 
 const MIN_INTERVAL_MS = 30 * 1000   // 30 秒
 const MAX_INTERVAL_MS = 60 * 1000   // 1 分钟
-const LATE_NIGHT_MIN_INTERVAL_MS = 2 * 60 * 1000
-const LATE_NIGHT_MAX_INTERVAL_MS = 4 * 60 * 1000
-const LATE_NIGHT_REPLY_PROBABILITY = 0.3
 
 function getRandomIntervalMs(): number {
-  if (isLateNightMode()) {
-    return Math.floor(
-      LATE_NIGHT_MIN_INTERVAL_MS +
-        Math.random() * (LATE_NIGHT_MAX_INTERVAL_MS - LATE_NIGHT_MIN_INTERVAL_MS)
-    )
-  }
   return Math.floor(
     MIN_INTERVAL_MS + Math.random() * (MAX_INTERVAL_MS - MIN_INTERVAL_MS)
   )
@@ -184,12 +174,6 @@ async function pollOnce(
   const hadNewMessages = await fetchAndUpdateGroupHistory(groupId, secretKeyStr)
 
   if (hadNewMessages) {
-    if (isLateNightMode() && Math.random() > LATE_NIGHT_REPLY_PROBABILITY) {
-      console.log(
-        `\n[${new Date().toLocaleTimeString('zh-CN')}] 🌙 深夜模式，跳过本次回复（保持安静）`
-      )
-      return
-    }
     const isDiscussion = process.env.REPLY_MODE === 'discussion'
     console.log(
       `\n[${new Date().toLocaleTimeString('zh-CN')}] 📬 检测到新消息，触发${isDiscussion ? '话题讨论' : '群聊回复'}...`

@@ -6,8 +6,8 @@
  *   npx ts-node scripts/send_space.ts <agentName> <toAddress> <amount> <unit>
  *   unit: space | sats  （space 会按 1 space = 10^8 sats 换算）
  * 可选: --confirm 跳过交互确认
- * 例: npx ts-node scripts/send_space.ts "AI Eason" "Mxxxx..." 0.001 space
- *     npx ts-node scripts/send_space.ts "AI Eason" "Mxxxx..." 100000 sats --confirm
+ * 例: npx ts-node scripts/send_space.ts "<agent_name>" "<to_address>" 0.001 space
+ *     npx ts-node scripts/send_space.ts "<agent_name>" "<to_address>" 100000 sats --confirm
  */
 
 import * as readline from 'readline'
@@ -38,7 +38,7 @@ async function main() {
 
   if (!agentName || !toAddress || !amountStr) {
     console.error('❌ 用法: npx ts-node scripts/send_space.ts <agentName> <toAddress> <amount> [space|sats] [--confirm]')
-    console.error('   例: npx ts-node scripts/send_space.ts "AI Eason" "Mxxx..." 0.001 space')
+    console.error('   例: npx ts-node scripts/send_space.ts "<agent_name>" "<to_address>" 0.001 space')
     process.exit(1)
   }
 

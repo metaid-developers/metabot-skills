@@ -97,7 +97,7 @@ async function main() {
     // Step 2: Extract username and buzz content from prompt
     const username = extractUsername(userPrompt)
     if (!username && needCreateWallet) {
-      throw new Error('Username is required. Please provide a username in your prompt (e.g., "名字叫\'Sunny\'")')
+      throw new Error('Username is required. Please provide a username in your prompt (e.g., "名字叫\'<agent_name>\'")')
     }
 
     const buzzContent = extractBuzzContent(userPrompt)

@@ -8,7 +8,8 @@
 import * as fs from 'fs'
 import * as path from 'path'
 
-const ROOT_DIR = path.join(__dirname, '..', '..')
+// 使用 process.cwd() 确保配置文件在用户项目根目录
+const ROOT_DIR = process.cwd()
 export const CHAT_CONFIG_FILE = path.join(ROOT_DIR, 'chat-config.json')
 export const CHAT_HISTORY_DIR = path.join(ROOT_DIR, 'chat-history')
 

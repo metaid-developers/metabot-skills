@@ -7,7 +7,8 @@
 import * as fs from 'fs'
 import * as path from 'path'
 
-const ROOT_DIR = path.join(__dirname, '..', '..')
+// 使用 process.cwd() 确保读取用户项目根目录下的 .env 文件
+const ROOT_DIR = process.cwd()
 const ENV_FILE = path.join(ROOT_DIR, '.env')
 const ENV_LOCAL_FILE = path.join(ROOT_DIR, '.env.local')
 const ENV_EXAMPLE_FILE = path.join(ROOT_DIR, '.env.example')

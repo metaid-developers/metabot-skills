@@ -37,6 +37,7 @@
 
 ## 配置来源
 
+- **groupId**：可由 AI 在调用前写入 `config.json`，或通过环境变量 `GROUP_ID` 传入；脚本（如 main.ts、join_group.ts）会优先使用 prompt/环境变量中的值并写回 config。
 - 在 `.env` 中配置：`GROUP_ID`、`GROUP_NAME`、`GROUP_ANNOUNCEMENT` 等
 - `groupInfoList[0].groupId` - 默认群 ID（必填）
 - `groupInfoList[0].grouplastIndex` - 消息索引（自动更新）

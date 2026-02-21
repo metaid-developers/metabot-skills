@@ -34,7 +34,7 @@
     "typescript": "^5.0.0",
     "ts-node": "^10.9.0"
   },
-  "keywords": ["metaid", "wallet", "mvc", "blockchain"],
+  "keywords": ["metaid", "metabot", "wallet", "blockchain"],
   "author": "",
   "license": "MIT"
 }

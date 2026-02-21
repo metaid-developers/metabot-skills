@@ -1,5 +1,5 @@
 {
-  "name": "metaid-agent-chat",
+  "name": "metabot-chat",
   "version": "1.0.0",
   "description": "metabot-chat skill for group chat management and messaging",
   "main": "scripts/main.ts",
@@ -8,13 +8,10 @@
     "start": "ts-node scripts/main.ts",
     "build": "tsc",
     "chat-reply": "ts-node scripts/chat_reply.ts",
-    "chat-poll": "ts-node scripts/chat_poll_scheduler.ts",
-    "chat-poll:bg": "bash scripts/run_chat_poll_background.sh",
-    "werewolf": "ts-node scripts/werewolf.ts",
-    "rebuttal-chat": "ts-node scripts/rebuttal_chat.ts",
-    "rebuttal-chat:poll": "ts-node scripts/rebuttal_chat_poll.ts",
-    "mixed-chat": "ts-node scripts/mixed_chat.ts",
-    "mixed-chat:poll": "ts-node scripts/mixed_chat_poll.ts"
+    "private-reply": "ts-node scripts/private_reply.ts",
+    "join-group": "ts-node scripts/join_group.ts",
+    "send-message": "ts-node scripts/send_message.ts",
+    "send-private": "ts-node scripts/send_private_message.ts"
   },
   "dependencies": {
     "crypto-js": "^4.2.0",
@@ -29,6 +26,7 @@
   },
   "keywords": [
     "metaid",
+    "metabot",
     "chat",
     "group",
     "messaging",

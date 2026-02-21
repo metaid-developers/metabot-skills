@@ -3,7 +3,7 @@
 /**
  * LLM Integration Module
  * Supports Deepseek, OpenAI, Claude, Gemini for generating intelligent, context-aware responses.
- * 配置解析优先级：account.json 的 accountList[].llm > config.json/ .env 默认配置。
+ * 配置来源：仅从 account.json 的 accountList[].llm 读取。
  */
 
 import { getEnv } from './env-config'
@@ -31,7 +31,7 @@ export interface LLMResponse {
   }
 }
 
-// 默认配置（不含 apiKey，apiKey 必须从 .env、config 或 account 传入）
+// 默认配置（不含 apiKey；apiKey 仅由 account.json 的 accountList[].llm 提供）
 const DEFAULT_CONFIG: Partial<LLMConfig> = {
   provider: 'deepseek',
   model: 'DeepSeek-V3.2',
@@ -78,32 +78,26 @@ export type ResolvedLLMConfig = Partial<LLMConfig>
 
 /**
  * 解析最终使用的 LLM 配置（供 generateLLMResponse 等使用）
- * 优先级：account.json 的 accountList[].llm（且含 apiKey）> config.json / .env 默认配置
- * @param account 当前账户（如 findAccountByUsername 的返回值），若有 llm 且带 apiKey 则优先使用
- * @param config 全局 config（如 readConfig()），其 llm 已由 normalizeConfig 合并过 .env 的 apiKey
+ * 配置来源：仅从 account.json 的 accountList[].llm 读取，不再尝试 config.json / .env
+ * @param account 当前账户（如 findAccountByUsername 的返回值），必须包含 llm 配置
+ * @param _config 保留参数以兼容调用方，但不再使用
  */
 export function getResolvedLLMConfig(
   account?: { llm?: unknown } | null,
-  config?: { llm?: Partial<LLMConfig> }
+  _config?: { llm?: Partial<LLMConfig> }
 ): ResolvedLLMConfig {
   const accountLlmRaw = account?.llm
   const accountLlm =
     accountLlmRaw != null
       ? (Array.isArray(accountLlmRaw) ? (accountLlmRaw as Partial<LLMConfig>[])[0] : (accountLlmRaw as Partial<LLMConfig>))
       : undefined
-  const hasAccountLlm = accountLlm?.apiKey != null && String(accountLlm.apiKey).trim() !== ''
-  const base = config?.llm ?? {}
 
-  const provider = (hasAccountLlm ? accountLlm!.provider : base.provider) || 'deepseek'
-  const prov = provider as LLMConfig['provider']
-  const apiKey = hasAccountLlm
-    ? accountLlm!.apiKey
-    : (base.apiKey || getApiKeyFromEnv(provider))
-  const model = hasAccountLlm
-    ? normalizeModel(provider, accountLlm!.model)
-    : normalizeModel(provider, base.model) || defaultModel(provider)
+  // 只从 account.json 读取，不再尝试 config.json / .env
+  const provider = (accountLlm?.provider || 'deepseek') as LLMConfig['provider']
+  const apiKey = accountLlm?.apiKey || ''
+  const model = normalizeModel(provider, accountLlm?.model) || defaultModel(provider)
   const baseUrl =
-    (hasAccountLlm ? accountLlm!.baseUrl : base.baseUrl) ||
+    accountLlm?.baseUrl ||
     (provider === 'gemini'
       ? 'https://generativelanguage.googleapis.com'
       : provider === 'deepseek'
@@ -115,12 +109,12 @@ export function getResolvedLLMConfig(
             : undefined)
 
   return {
-    provider: prov,
+    provider,
     apiKey,
     baseUrl,
     model,
-    temperature: hasAccountLlm ? accountLlm!.temperature : base.temperature,
-    maxTokens: hasAccountLlm ? accountLlm!.maxTokens : base.maxTokens,
+    temperature: accountLlm?.temperature,
+    maxTokens: accountLlm?.maxTokens,
   }
 }
 
@@ -136,7 +130,7 @@ export async function generateLLMResponse(
   // Check if API key is provided
   if (!finalConfig.apiKey) {
     throw new Error(
-      'LLM API key not configured. Please set DEEPSEEK_API_KEY, OPENAI_API_KEY, CLAUDE_API_KEY or GEMINI_API_KEY in .env, or configure in account.json / config.json'
+      'LLM API key not configured. Please configure llm.apiKey in account.json for the current MetaBot (accountList[].llm).'
     )
   }
 
@@ -464,7 +458,7 @@ export async function generateDiscussionMessage(
 
 /**
  * 根据最近30条群聊记录生成回复
- * - 若有人提及 metabot-basic：重点回复该人
+ * - 若有人 @提及本 Agent：重点回复该人
  * - 若无提及：日常聊天，自然回复，不刻意展开话题
  */
 export async function generateChatReply(
@@ -477,7 +471,7 @@ export async function generateChatReply(
     masteringLanguages?: string[]
   },
   options: {
-    /** 是否有人提及 metabot-basic，若有则重点回复提及者 */
+    /** 是否有人 @提及本 Agent，若有则重点回复提及者 */
     hasMetaIDAgentMention: boolean
     /** 提及者的姓名，用于 @ 回复 */
     mentionTargetName?: string
@@ -503,18 +497,18 @@ export async function generateChatReply(
 
 【重要】模仿人类对话：有新消息就针对新消息或最近上下文适当回复即可。回复长度适中（通常一两句到几句），语气自然，可简短可稍展开，但每次只输出一条回复。禁止在一条回复里模拟多轮对话或列出多条回答。`
     : options.hasMetaIDAgentMention
-    ? `你是"${agentName}"，在 🤖MetaBot 畅聊群中。有人提到了 metabot-basic，请重点回复此人。
+    ? `你是"${agentName}"，正在群聊中。有人 @提及了你，请回复此人。
 
 【人设】性格：${character}，兴趣：${preference || '广泛'}，目标：${goal || '参与交流'}
 
-【任务】针对"${options.mentionTargetName}"的发言（内容：${(options.mentionTargetContent || '').slice(0, 100)}...）进行回复。你可以介绍 metabot-basic 相关能力、分享使用体验、或回答对方可能关心的问题。
+【任务】针对"${options.mentionTargetName}"的发言（内容：${(options.mentionTargetContent || '').slice(0, 100)}...）进行回复。根据对方消息内容自然回复即可。
 
 【重要】群内有 Agent 也有真人用户。不要只跟 Agent 互动，要主动与真人、非 Agent 用户交流。回复某人时在开头写 @对方名字，系统会通过 globalMetaId 正确 @ 提及。
 
 【禁止】不得 @自己，不得在回复中 @ 自己的名字（当前你的名字是「${agentName}」）。不允许自己对自己的消息进行回复或提及自己。
 
 【人类化表达】字数随机：有时简短（十几字）、有时展开（上百字）。语气要有起伏：可热情、可调侃、可认真。若需@对方，在开头写 @对方名字。`
-    : `你是"${agentName}"，在 🤖MetaBot 畅聊群中。根据最近聊天记录进行日常回复。
+    : `你是"${agentName}"，正在群聊中。根据最近聊天记录进行日常回复。
 ${options.discussionTopic ? `\n【当前讨论话题】大家正在自由讨论：\n${options.discussionTopic}\n请结合聊天记录自然发言，可发表观点、提问、反驳、补充。没有发言次数限制，说得不对的可以提出疑问和建议。\n` : ''}
 【人设】性格：${character}，兴趣：${preference || '广泛'}，目标：${goal || '参与交流'}
 
@@ -545,7 +539,7 @@ ${options.discussionTopic ? `\n【当前讨论话题】大家正在自由讨论�
   } catch (error: any) {
     console.error(`⚠️  generateChatReply 失败: ${error.message}`)
     const fallback = options.hasMetaIDAgentMention
-      ? `@${options.mentionTargetName} 感谢提到 metabot-basic！有什么想了解的可以问我～`
+      ? `@${options.mentionTargetName} 收到～有什么想聊的？`
       : '嗯，大家聊得挺有意思的～'
     return { content: fallback, mentionName: options.mentionTargetName }
   }
@@ -566,7 +560,7 @@ export async function generateRebuttalReply(
   const preference = userProfile?.preference || '喜欢唱反调'
   const goal = userProfile?.goal || '引起争议'
 
-  const systemPrompt = `你是"${agentName}"，在 🤖MetaBot 畅聊群中。你的核心人设是**反驳型**：喜欢唱反调、吵架、专门捣乱引起争议。
+  const systemPrompt = `你是"${agentName}"，正在群聊中。你的核心人设是**反驳型**：喜欢唱反调、吵架、专门捣乱引起争议。
 ${options?.discussionTopic ? `\n【当前讨论话题】大家正在自由讨论：\n${options.discussionTopic}\n请围绕此话题反驳他人观点，可追问、质疑、提出不同看法。\n` : ''}
 【人设】性格：${character}，喜好：${preference}，目标：${goal}
 

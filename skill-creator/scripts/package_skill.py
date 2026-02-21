@@ -15,6 +15,30 @@ import zipfile
 from pathlib import Path
 from quick_validate import validate_skill
 
+# Paths/patterns to exclude from publishable .skill (no node_modules, secrets, runtime files)
+EXCLUDE_DIRS = {'node_modules', '__pycache__', '.git', 'chat-history'}
+EXCLUDE_FILES = {'.env'}  # .env.example is included as template
+EXCLUDE_SUFFIXES = ('.log', '.pid', '.pyc', '.pyo')
+
+
+def _should_exclude(file_path: Path, skill_path: Path) -> bool:
+    """Return True if file should be excluded from the package."""
+    try:
+        rel = file_path.relative_to(skill_path)
+    except ValueError:
+        return True
+    parts = rel.parts
+    for part in parts:
+        if part in EXCLUDE_DIRS:
+            return True
+    if rel.name in EXCLUDE_FILES:
+        return True
+    if rel.name.startswith('.') and rel.suffix == '.pid':
+        return True
+    if rel.suffix in EXCLUDE_SUFFIXES:
+        return True
+    return False
+
 
 def package_skill(skill_path, output_dir=None):
     """
@@ -66,13 +90,17 @@ def package_skill(skill_path, output_dir=None):
     # Create the .skill file (zip format)
     try:
         with zipfile.ZipFile(skill_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            # Walk through the skill directory
+            added = 0
             for file_path in skill_path.rglob('*'):
-                if file_path.is_file():
-                    # Calculate the relative path within the zip
-                    arcname = file_path.relative_to(skill_path.parent)
-                    zipf.write(file_path, arcname)
-                    print(f"  Added: {arcname}")
+                if not file_path.is_file():
+                    continue
+                if _should_exclude(file_path, skill_path):
+                    continue
+                arcname = file_path.relative_to(skill_path.parent)
+                zipf.write(file_path, arcname)
+                print(f"  Added: {arcname}")
+                added += 1
+            print(f"\n  Total files: {added}")
 
         print(f"\n✅ Successfully packaged skill to: {skill_filename}")
         return skill_filename

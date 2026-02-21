@@ -3,7 +3,7 @@
 /**
  * DOGE 转账：使用指定 Agent 向地址转 DOGE（最小 0.01 DOGE）。
  * Usage: npx ts-node scripts/send_doge.ts <agentName> <toAddress> <amountSatoshis> [--confirm]
- * 例: npx ts-node scripts/send_doge.ts "AI Eason" "Dxxx..." 1000000
+ * 例: npx ts-node scripts/send_doge.ts "<agent_name>" "<to_address>" 1000000
  */
 
 import * as readline from 'readline'

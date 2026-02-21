@@ -15,7 +15,7 @@
 #
 # 示例:
 #   bash upload_with_balance_check.sh res/file/photo.jpg
-#   bash upload_with_balance_check.sh res/file/video.mp4 --agent "AI Eason"
+#   bash upload_with_balance_check.sh res/file/video.mp4 --agent "<agent_name>"
 #   bash upload_with_balance_check.sh res/file/photo.jpg --account-index 1
 
 set -e
@@ -60,7 +60,7 @@ if [ $# -eq 0 ]; then
     echo ""
     echo "示例:"
     echo "  $0 res/file/photo.jpg"
-    echo "  $0 res/file/video.mp4 --agent \"AI Eason\""
+    echo "  $0 res/file/video.mp4 --agent \"<agent_name>\""
     echo "  $0 res/file/photo.jpg --account-index 1"
     exit 1
 fi

@@ -4,7 +4,7 @@
  * 支持 --keyword 或 --account-index，输出 JSON: mvcAddress, userName, path, addressIndex, metaId
  *
  * 运行: 在 metabot-file 目录下
- *   npx ts-node scripts/metafs_account_info.ts [--keyword "AI Eason"] [--account-index 0] [--account-file /path/to/account.json]
+ *   npx ts-node scripts/metafs_account_info.ts [--keyword "<agent_name>"] [--account-index 0] [--account-file /path/to/account.json]
  */
 
 import * as fs from 'fs'
