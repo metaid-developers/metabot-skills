@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IDFramework Chat Box Test</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f3f4f6;
+      color: #111827;
+    }
+    .page {
+      max-width: 920px;
+      margin: 24px auto;
+      padding: 0 12px 32px;
+    }
+    .panel {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .title {
+      margin: 0 0 8px 0;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .desc {
+      margin: 0;
+      color: #6b7280;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .mono {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #111827;
+      color: #f9fafb;
+      font-size: 12px;
+      overflow: auto;
+    }
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+  </style>
+  <script>
+    window.addEventListener('alpine:init', () => {
+      if (!Alpine.store('user')) {
+        Alpine.store('user', {
+          user: {},
+          isLoading: false,
+          error: null,
+          showProfileEditModal: false,
+        });
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="connect-button-wrapper">
+    <id-connect-button></id-connect-button>
+  </div>
+
+  <div class="page">
+    <section class="panel">
+      <h1 class="title">id-chat-box + id-chat-bubble 测试页</h1>
+      <p class="desc">
+        页面路由格式：<code>#/chat/public/{groupId}</code> 或 <code>#/chat/private/{globalMetaId}</code>。
+        当前页面会根据路由自动配置聊天记录组件与输入组件，并在钱包登录后自动连 socket。
+      </p>
+      <div id="route-tip" class="mono"></div>
+    </section>
+
+    <section class="panel">
+      <h2 class="title" style="font-size: 16px;">聊天 UI</h2>
+      <div class="stack">
+        <id-chat-box id="chat-box" height="85vh"></id-chat-box>
+        <id-chat-input-box id="chat-input"></id-chat-input-box>
+      </div>
+    </section>
+  </div>
+
+  <script src="../idframework/idconfig.js"></script>
+  <script src="../idframework/idutils.js"></script>
+  <script src="../idframework/crypto.js"></script>
+  <script src="../idframework/stores/useApprovedStore.js"></script>
+  <script src="../idframework/metaid.js"></script>
+  <script type="module" src="../templates/idframework.js"></script>
+  <script type="module">
+    import '../idframework/idcomponents/id-chat-box.js';
+    import '../idframework/idcomponents/id-chat-input-box.js';
+
+    async function waitForFramework() {
+      for (let i = 0; i < 120; i += 1) {
+        if (window.IDFramework && window.IDFramework.IDController) return;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      throw new Error('IDFramework 初始化超时');
+    }
+
+    (async () => {
+      await waitForFramework();
+      window.IDFramework.IDController.register('fetchUser', '../idframework/commands/FetchUserCommand.js');
+      window.IDFramework.IDController.register('fetchUserInfo', '../idframework/commands/FetchUserInfoCommand.js');
+      window.IDFramework.IDController.register('sendChatMessage', '../idframework/commands/SendChatMessageCommand.js');
+      await import('../idframework/idcomponents/id-connect-button.js');
+
+      const connectButton = document.querySelector('id-connect-button');
+      const chatInput = document.getElementById('chat-input');
+      const chatBox = document.getElementById('chat-box');
+      const routeTip = document.getElementById('route-tip');
+
+      const DEFAULT_PRIVATE_GLOBAL_META_ID = 'idq1v8w7n8pfzcw9x0dqe3xl0eek3ypj2apswy58ez';
+
+      function parseRoute() {
+        const hash = String(location.hash || '').replace(/^#/, '');
+        const parts = hash.split('/').filter(Boolean);
+        if (parts.length >= 3 && parts[0] === 'chat') {
+          const mode = parts[1] === 'private' ? 'private' : 'public';
+          const id = decodeURIComponent(parts.slice(2).join('/'));
+          if (id) {
+            return { mode, id };
+          }
+        }
+        return { mode: 'private', id: DEFAULT_PRIVATE_GLOBAL_META_ID };
+      }
+
+      function applyRouteToComponents() {
+        const route = parseRoute();
+        if (!chatInput || !chatBox) return;
+        chatInput.removeAttribute('group-id');
+        chatInput.removeAttribute('to-metaid');
+        chatBox.removeAttribute('group-id');
+        chatBox.removeAttribute('globalmetaid');
+
+        if (route.mode === 'private') {
+          chatInput.setAttribute('mode', 'private');
+          chatInput.setAttribute('to-metaid', route.id);
+          chatInput.setAttribute('channel-name', 'Private Chat');
+          chatBox.setAttribute('mode', 'private');
+          chatBox.setAttribute('globalmetaid', route.id);
+          routeTip.textContent = `private globalMetaId: ${route.id}`;
+        } else {
+          chatInput.setAttribute('mode', 'group');
+          chatInput.setAttribute('group-id', route.id);
+          chatInput.setAttribute('channel-name', 'Public Group');
+          chatBox.setAttribute('mode', 'public');
+          chatBox.setAttribute('group-id', route.id);
+          routeTip.textContent = `public groupId: ${route.id}`;
+        }
+      }
+
+      async function forceFetchUser() {
+        const walletStore = (typeof Alpine !== 'undefined') ? Alpine.store('wallet') : null;
+        if (!walletStore || !walletStore.address) return;
+        const payload = walletStore.globalMetaId
+          ? { globalMetaId: walletStore.globalMetaId }
+          : { address: walletStore.address };
+        try {
+          await window.IDFramework.dispatch('fetchUser', payload);
+        } catch (error) {
+          console.warn('force fetchUser failed:', error);
+        }
+      }
+
+      if (connectButton) {
+        connectButton.addEventListener('connected', () => {
+          forceFetchUser();
+        });
+      }
+
+      if (chatBox) {
+        chatInput.addEventListener('chat-sent', (event) => {
+          console.log('chat sent:', event.detail);
+        });
+      }
+
+      applyRouteToComponents();
+      window.addEventListener('hashchange', applyRouteToComponents);
+      await forceFetchUser();
+    })().catch((error) => {
+      console.error('chat test init error:', error);
+    });
+  </script>
+</body>
+</html>
+

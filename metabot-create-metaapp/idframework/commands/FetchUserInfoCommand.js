@@ -1,11 +1,11 @@
 /**
- * FetchUserInfoCommand - Business Logic for fetching user information by metaid
+ * FetchUserInfoCommand - Business Logic for fetching user information
  * 
  * Command Pattern implementation following IDFramework architecture.
  * 
  * This command:
  * 1. Uses UserDelegate to fetch user data (with IndexedDB caching)
- * 2. Returns user information including avatar, name, and metaid
+ * 2. Returns user information data object from API response
  * 
  * @class FetchUserInfoCommand
  */
@@ -16,16 +16,20 @@ export default class FetchUserInfoCommand {
    * @param {Object} params - Command parameters
    * @param {Object} params.payload - Event payload
    *   - metaid: {string} - MetaID to fetch user info for
+   *   - globalMetaId/globalmetaid: {string} - GlobalMetaId to fetch user info for
    * @param {Object} params.stores - Alpine stores object
    * @param {Function} params.userDelegate - UserDelegate function
-   * @returns {Promise<Object>} User data with avatarUrl, name, metaid
+   * @returns {Promise<Object>} API "data" object
    */
   async execute({ payload = {}, stores, userDelegate }) {
     try {
-      const { metaid } = payload;
+      const metaid = payload.metaid ? String(payload.metaid).trim() : '';
+      const globalMetaId = payload.globalMetaId
+        ? String(payload.globalMetaId).trim()
+        : (payload.globalmetaid ? String(payload.globalmetaid).trim() : '');
 
-      if (!metaid) {
-        throw new Error('metaid is required');
+      if (!metaid && !globalMetaId) {
+        throw new Error('metaid or globalMetaId is required');
       }
 
       // Use UserDelegate to fetch user data (with IndexedDB caching)
@@ -33,16 +37,16 @@ export default class FetchUserInfoCommand {
         throw new Error('UserDelegate is not available');
       }
 
-      const userData = await userDelegate('metafs', `/info/metaid/${metaid}`, {
-        metaid: metaid,
-      });
+      const endpoint = globalMetaId
+        ? `/v1/info/globalmetaid/${globalMetaId}`
+        : `/info/metaid/${metaid}`;
+      const userData = await userDelegate('metafs', endpoint, globalMetaId ? { globalMetaId } : { metaid });
+      const data = userData && typeof userData === 'object' && userData.data && typeof userData.data === 'object'
+        ? userData.data
+        : userData;
 
-      // Return user data with required fields
-      return {
-        avatarUrl: userData.avatarUrl || userData.avatar || '',
-        name: userData.name || '',
-        metaid: userData.metaid || metaid
-      };
+      // Return API data payload directly.
+      return data && typeof data === 'object' ? data : {};
     } catch (error) {
       console.error('FetchUserInfoCommand error:', error);
       throw error;

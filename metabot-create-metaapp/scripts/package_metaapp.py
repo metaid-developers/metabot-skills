@@ -17,6 +17,7 @@ import argparse
 import os
 import sys
 import time
+import subprocess
 import zipfile
 from pathlib import Path
 
@@ -231,6 +232,26 @@ Examples:
         print(f"\nRequired files: {', '.join(METAAPP_REQUIRED_FILES)}", file=sys.stderr)
         print(f"Required directories: {', '.join(METAAPP_REQUIRED_DIRS)}", file=sys.stderr)
         sys.exit(1)
+
+    # Hard gate: run checklist validator before packaging
+    current_script = Path(__file__).resolve()
+    checklist_script = current_script.parent / "validate_metaapp_checklist.py"
+    if checklist_script.is_file():
+        print("🔍 Running hard checklist gate (predeliver)...")
+        cmd = [
+            sys.executable,
+            str(checklist_script),
+            "--phase",
+            "predeliver",
+            "--project",
+            str(project_root),
+        ]
+        result = subprocess.run(cmd, text=True)
+        if result.returncode != 0:
+            print("❌ Packaging aborted: checklist gate failed.", file=sys.stderr)
+            sys.exit(result.returncode)
+    else:
+        print(f"⚠️ Warning: checklist script not found: {checklist_script}", file=sys.stderr)
     
     # Generate output path
     if args.output:

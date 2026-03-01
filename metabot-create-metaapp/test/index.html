@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IDFramework Buzz List Test</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+    }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f3f4f6;
+      color: #111827;
+    }
+    .page {
+      max-width: 840px;
+      margin: 24px auto;
+      padding: 0 12px;
+    }
+    .panel {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .title {
+      margin: 0 0 6px 0;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .desc {
+      margin: 0;
+      color: #6b7280;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+  </style>
+  <script>
+    window.addEventListener('alpine:init', () => {
+      if (!Alpine.store('buzz')) {
+        Alpine.store('buzz', {
+          total: 0,
+          nextCursor: 0,
+          lastUpdatedAt: 0,
+        });
+      }
+      if (!Alpine.store('user')) {
+        Alpine.store('user', {
+          user: {},
+          isLoading: false,
+          error: null,
+          showProfileEditModal: false,
+        });
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="connect-button-wrapper">
+    <id-connect-button></id-connect-button>
+  </div>
+  <div class="page">
+    <section class="panel">
+      <h1 class="title">Buzz 组件测试页</h1>
+      <p class="desc">
+        该页面用于验证 Post Buzz（文本+附件）与 Buzz 列表渲染、按地址获取用户信息、IndexedDB 缓存、下拉分页等功能。
+      </p>
+    </section>
+
+    <section class="panel">
+      <h2 class="title" style="font-size:16px;">id-post-buzz 独立测试</h2>
+      <p class="desc" style="margin-bottom:10px;">
+        在这里可直接测试发帖与附件上传上链。发布成功后会在下方列表中看到新数据（取决于链上索引刷新时间）。
+      </p>
+      <id-post-buzz></id-post-buzz>
+    </section>
+
+    <id-buzz-list path="/protocols/simplebuzz" page-size="20"></id-buzz-list>
+  </div>
+
+  <script src="../idframework/idconfig.js"></script>
+  <script src="../idframework/idutils.js"></script>
+  <script src="../idframework/metaid.js"></script>
+  <script type="module" src="../templates/idframework.js"></script>
+  <script type="module">
+    import '../idframework/idcomponents/id-buzz-list.js';
+    import '../idframework/idcomponents/id-post-buzz.js';
+
+    async function waitForFramework() {
+      for (let i = 0; i < 120; i += 1) {
+        if (window.IDFramework && window.IDFramework.IDController) return;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      throw new Error('IDFramework 初始化超时');
+    }
+
+    (async () => {
+      await waitForFramework();
+      
+      window.IDFramework.IDController.register('fetchBuzz', '../idframework/commands/FetchBuzzCommand.js');
+      window.IDFramework.IDController.register('fetchUser', '../idframework/commands/FetchUserCommand.js');
+      window.IDFramework.IDController.register('postBuzz', '../idframework/commands/PostBuzzCommand.js');
+      window.IDFramework.IDController.register('getPinDetail', '../idframework/commands/GetPinDetailCommand.js');
+      // Important: load connect-button after command registration,
+      // so its internal fetchUser call never runs before command is ready.
+      await import('../idframework/idcomponents/id-connect-button.js');
+
+      const postComposer = document.querySelector('id-post-buzz');
+      const buzzList = document.querySelector('id-buzz-list');
+      if (postComposer && buzzList) {
+        postComposer.addEventListener('buzz-posted', () => {
+          if (typeof buzzList.refresh === 'function') {
+            buzzList.refresh();
+          }
+        });
+      }
+
+      const connectButton = document.querySelector('id-connect-button');
+      async function forceFetchUser() {
+        const walletStore = (typeof Alpine !== 'undefined') ? Alpine.store('wallet') : null;
+        if (!walletStore || !walletStore.address) return;
+        const payload = walletStore.globalMetaId
+          ? { globalMetaId: walletStore.globalMetaId }
+          : { address: walletStore.address };
+        try {
+          await window.IDFramework.dispatch('fetchUser', payload);
+        } catch (error) {
+          console.warn('force fetchUser failed:', error);
+        }
+      }
+
+      if (connectButton) {
+        connectButton.addEventListener('connected', () => {
+          forceFetchUser();
+        });
+      }
+
+      // If wallet is already connected (e.g. cached session), trigger once on page init.
+      await forceFetchUser();
+    })().catch((error) => {
+      console.error('注册 FetchBuzzCommand 失败:', error);
+    });
+  </script>
+</body>
+</html>

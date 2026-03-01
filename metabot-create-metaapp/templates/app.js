@@ -11,8 +11,9 @@
 // ============================================
 // ServiceLocator - Service Endpoint Configuration
 // ============================================
-// Define base URLs for various services used by BusinessDelegate
-// Services are accessed via serviceKey in BusinessDelegate calls
+// Define base URLs for various services used by BusinessDelegate.
+// idconfig.js may have already set ServiceLocator defaults; here we override or extend.
+// For MetaID user registration, set window.__createOrUpdateUserInfoImpl to your implementation.
 window.ServiceLocator = {
   metaid_man: 'https://manapi.metaid.io', // MetaID data indexer API
   metafs: 'https://file.metaid.io/metafile-indexer/api', // MetaFS service for user info and avatars
@@ -132,6 +133,11 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // IDFramework.IDController.register('ROUTE_CHANGE', './commands/NavigateCommand.js'); // Disabled - routing disabled
   IDFramework.IDController.register('fetchUser', './commands/FetchUserCommand.js');
+  IDFramework.IDController.register('fetchUserInfo', './commands/FetchUserInfoCommand.js');
+  IDFramework.IDController.register('fetchBuzz', './commands/FetchBuzzCommand.js');
+  IDFramework.IDController.register('postBuzz', './commands/PostBuzzCommand.js');
+  IDFramework.IDController.register('sendChatMessage', './commands/SendChatMessageCommand.js');
+  IDFramework.IDController.register('getPinDetail', './commands/GetPinDetailCommand.js');
   IDFramework.IDController.register('checkWebViewBridge', './commands/CheckWebViewBridgeCommand.js');
   IDFramework.IDController.register('checkBtcAddressSameAsMvc', './commands/CheckBtcAddressSameAsMvcCommand.js');
   

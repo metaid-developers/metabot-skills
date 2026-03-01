@@ -371,10 +371,18 @@ metaapp/
     <id-connect-button></id-connect-button>
   </div>
 
-  <!-- 5. 框架核心 (必须，使用相对路径) -->
+  <!-- 5. 基础依赖 (必须，使用相对路径) -->
+  <script src="./idconfig.js"></script>
+  <script src="./idutils.js"></script>
+
+  <!-- 5.1 可选依赖（按需） -->
+  <!-- 仅当命令中需要使用 MetaIDJs.mvc / MetaIDJs.TxComposer 时才引入 -->
+  <!-- <script src="./metaid.js"></script> -->
+
+  <!-- 6. 框架核心 (必须，使用相对路径) -->
   <script type="module" src="./idframework.js"></script>
   
-  <!-- 6. 应用配置 (必须，使用相对路径) -->
+  <!-- 7. 应用配置 (必须，使用相对路径) -->
   <script type="module" src="./app.js"></script>
 </body>
 </html>
@@ -386,6 +394,8 @@ metaapp/
 2. **加载顺序**：
    - Alpine.js 必须最先加载（使用 `defer`）
    - `alpine:init` 脚本必须在 Alpine.js 之后、DOM 之前
+   - `idconfig.js`、`idutils.js` 必须在 `idframework.js` 之前加载
+   - 仅在需要 `MetaIDJs`（`mvc` / `TxComposer`）时才引入 `metaid.js`，且同样应在 `idframework.js` 之前加载
    - `idframework.js` 必须在 `app.js` 之前
 3. **组件引入**：
    - 基础组件可以在 `index.html` 中静态引入
@@ -1432,7 +1442,8 @@ IDFramework.IDController.register('newCommand', './commands/NewCommand.js');
 生成代码后，AI 需要检查：
 
 - [ ] 所有路径使用相对路径（`./` 开头）
-- [ ] `index.html` 中正确引入了 `idframework.js` 和 `app.js`
+- [ ] `index.html` 中正确引入了 `idconfig.js`、`idutils.js`、`idframework.js`、`app.js`
+- [ ] 若业务使用 `mvc` / `TxComposer`，已按需引入 `metaid.js`
 - [ ] `app.js` 中注册了所有自定义命令
 - [ ] 组件文件名以 `id-` 开头
 - [ ] 组件使用 Shadow DOM 和 CSS Variables

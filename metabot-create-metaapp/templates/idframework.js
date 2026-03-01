@@ -170,35 +170,44 @@ class IDFramework {
      * 3. If not found, fetch from remote API and cache in IndexedDB
      * 
      * @param {string} serviceKey - Key to look up BaseURL from ServiceLocator (e.g., 'metafs')
-     * @param {string} endpoint - API endpoint path (e.g., '/info/metaid/xxx')
+     * @param {string} endpoint - API endpoint path (e.g., '/info/metaid/xxx' or '/v1/users/address/xxx')
      * @param {Object} options - Fetch options (method, headers, body, etc.)
-     * @param {string} options.metaid - MetaID to fetch user info for (required)
+     * @param {string} [options.metaid] - MetaID (optional when using address)
+     * @param {string} [options.address] - Address (optional when using metaid)
      * @returns {Promise<Object>} User data object with avatar image
      * 
      * @example
-     * const userData = await IDFramework.Delegate.UserDelegate('metafs', '/info/metaid/xxx', {
-     *   metaid: '4091a83e631ef80ad55088c80e22e58747671a288aa64441f34d91f5c87532bb'
-     * });
+     * const userData = await IDFramework.Delegate.UserDelegate('metafs', '/v1/users/address/' + address, { address });
      */
     async UserDelegate(serviceKey, endpoint, options = {}) {
-      // Extract metaid from options or from endpoint
+      // Extract metaid from options or from endpoint (/info/metaid/xxx)
       let metaid = options.metaid;
-      
-      // If metaid not in options, try to extract from endpoint
       if (!metaid && endpoint) {
-        const match = endpoint.match(/\/info\/metaid\/([^\/]+)/);
-        if (match) {
-          metaid = match[1];
-        }
-      }
-      
-      if (!metaid) {
-        throw new Error('UserDelegate: metaid is required (provide in options.metaid or endpoint)');
+        const metaidMatch = endpoint.match(/\/info\/metaid\/([^\/]+)/);
+        if (metaidMatch) metaid = metaidMatch[1];
       }
 
-      // Step 1: Check IndexedDB for cached user data
+      // Extract globalMetaId from options or from endpoint (/info/globalmetaid/xxx)
+      let globalMetaId = options.globalMetaId;
+      if (!globalMetaId && endpoint) {
+        const gmidMatch = endpoint.match(/\/info\/globalmetaid\/([^\/]+)/);
+        if (gmidMatch) globalMetaId = gmidMatch[1];
+      }
+
+      // Extract address from options or from endpoint (/info/address/xxx or /v1/users/address/xxx)
+      let address = options.address;
+      if (!address && endpoint) {
+        const addressMatch = endpoint.match(/\/(?:info\/address|v1\/users\/address)\/([^\/]+)/);
+        if (addressMatch) address = addressMatch[1];
+      }
+
+      if (!metaid && !globalMetaId && !address) {
+        throw new Error('UserDelegate: metaid, globalMetaId or address is required (provide in options or endpoint)');
+      }
+
+      // Step 1: Check IndexedDB for cached user data (only when we have metaid; address-based fetch skips cache)
       try {
-        const cachedUser = await this._getUserFromIndexedDB(metaid);
+        const cachedUser = metaid ? await this._getUserFromIndexedDB(metaid) : null;
         if (cachedUser) {
           // If cached user has old avatarImg but no avatarUrl, update it
           if (cachedUser.avatarImg && !cachedUser.avatarUrl) {
@@ -242,8 +251,10 @@ class IDFramework {
       }
 
       const baseURL = window.ServiceLocator[serviceKey];
-      // Use provided endpoint or construct default endpoint
-      const finalEndpoint = endpoint || `/info/metaid/${metaid}`;
+      const finalEndpoint = endpoint || (globalMetaId ? `/info/globalmetaid/${globalMetaId}` : (metaid ? `/info/metaid/${metaid}` : (address ? `/info/address/${address}` : null)));
+      if (!finalEndpoint) {
+        throw new Error('UserDelegate: endpoint or metaid or globalMetaId or address is required');
+      }
       const url = `${baseURL}${finalEndpoint}`;
 
       try {
@@ -261,46 +272,47 @@ class IDFramework {
 
         const userData = await response.json();
 
-        // Extract user info from API response
+        // Extract user info from API response (support code===1 + data, or data only, or raw user object)
+        let userInfo = null;
         if (userData.code === 1 && userData.data) {
-          const userInfo = userData.data;
+          userInfo = userData.data;
+        } else if (userData.data != null) {
+          userInfo = userData.data;
+        } else if (userData.metaid != null || userData.metaId != null || userData.address != null || userData.name != null) {
+          userInfo = userData;
+        }
+
+        if (userInfo) {
           
-          // Step 3: Store avatar URL (not base64) to avoid CORS issues
-          // We'll use the URL directly in <img> tags, which don't have CORS restrictions
-          // Example correct URL: https://file.metaid.io/metafile-indexer/api/v1/users/avatar/accelerate/dc5284fc2ea18067a3a2f8e50c41825e11c27a71b9574a38ac92d889841e1bc6i0
+          // Step 3: Avatar URL – support full URL from API or build from path/id
+          // API may return avatar as full URL (e.g. https://metafs.oss-cn-beijing.aliyuncs.com/...) or path (e.g. /content/xxx)
           let avatarUrl = null;
-          
-          // Check for avatarId first, then fallback to extracting from avatar path
-          if (userInfo.avatarId) {
-            // Use the accelerate endpoint URL directly
-            avatarUrl = `${baseURL}/v1/users/avatar/accelerate/${userInfo.avatarId}`;
-          } else if (userInfo.avatar) {
-            // Extract avatar ID from avatar path
-            // Example: '/content/c01608381d41661448c5212a4a14282b42d8f46bd257caaa01cd8e2bdd342dd2i0'
-            // We need to extract: 'c01608381d41661448c5212a4a14282b42d8f46bd257caaa01cd8e2bdd342dd2i0'
-            const avatarPath = userInfo.avatar;
-            // Extract the filename part (everything after the last '/')
-            const avatarFileName = avatarPath.split('/').pop();
+          const avatarId = userInfo.avatarId || userInfo.avatarPinId;
+          const avatarRaw = userInfo.avatar;
+          if (avatarRaw && (typeof avatarRaw === 'string' && (avatarRaw.startsWith('http://') || avatarRaw.startsWith('https://')))) {
+            avatarUrl = avatarRaw;
+          } else if (avatarId) {
+            avatarUrl = `${baseURL}/v1/users/avatar/accelerate/${avatarId}`;
+          } else if (avatarRaw) {
+            const avatarFileName = avatarRaw.split('/').pop();
             if (avatarFileName) {
               avatarUrl = `${baseURL}/v1/users/avatar/accelerate/${avatarFileName}`;
-            } else {
-              console.warn(`UserDelegate: Could not extract filename from avatar path: ${avatarPath}`);
             }
           }
 
-            // Step 4: Prepare user object for storage
-            const userObject = {
-              globalMetaId: userInfo.globalMetaId || '',
-              metaid: userInfo.metaid || metaid,
-              name: userInfo.name || '',
-              nameId:userInfo.nameId ||'',
-              address: userInfo.address || '',
-              avatar: userInfo.avatar || '',
-              avatarId: userInfo.avatarId || '',
-              chatpubkey: userInfo.chatpubkey || '',
-              chatpubkeyId: userInfo.chatpubkeyId || '',
-              avatarUrl: avatarUrl, // Avatar image URL (not base64, to avoid CORS)
-            };
+          // Step 4: Prepare user object for storage (map API fields: metaId→metaid, namePinId→nameId, avatarPinId→avatarId, chatPublicKey→chatpubkey)
+          const userObject = {
+            globalMetaId: userInfo.globalMetaId || '',
+            metaid: userInfo.metaid || userInfo.metaId || metaid,
+            name: userInfo.name || '',
+            nameId: userInfo.nameId || userInfo.namePinId || '',
+            address: userInfo.address || address || '',
+            avatar: userInfo.avatar || '',
+            avatarId: userInfo.avatarId || userInfo.avatarPinId || '',
+            chatpubkey: userInfo.chatpubkey || userInfo.chatPublicKey || '',
+            chatpubkeyId: userInfo.chatpubkeyId || userInfo.chatPublicKeyPinId || '',
+            avatarUrl: avatarUrl,
+          };
 
           // Step 5: Store in IndexedDB
           try {
@@ -312,7 +324,10 @@ class IDFramework {
 
           return userObject;
         } else {
-          throw new Error(`API returned error: ${userData.message || 'Unknown error'}`);
+          const msg = (userData.message && userData.message !== 'success')
+            ? userData.message
+            : 'API response format not recognized (missing data or user object)';
+          throw new Error(`UserDelegate: ${msg}`);
         }
       } catch (error) {
         console.error(`UserDelegate error for ${serviceKey}${endpoint}:`, error);
@@ -565,13 +580,13 @@ class IDFramework {
             };
           }
           
-          await builtInCommand({
+          const builtInResult = await builtInCommand({
             payload,
             stores,
             delegate: IDFramework.Delegate.BusinessDelegate.bind(IDFramework.Delegate),
             userDelegate: IDFramework.Delegate.UserDelegate.bind(IDFramework.Delegate),
           });
-          return;
+          return builtInResult;
         } catch (error) {
           console.error(`Error executing built-in command '${eventName}':`, error);
           throw error;
@@ -617,12 +632,13 @@ class IDFramework {
         // Execute command with Delegate and stores
         // Commands can use either BusinessDelegate or UserDelegate
         // Bind UserDelegate to Delegate object to ensure 'this' context is correct
-        await command.execute({
+        const commandResult = await command.execute({
           payload,
           stores,
           delegate: IDFramework.Delegate.BusinessDelegate.bind(IDFramework.Delegate),
           userDelegate: IDFramework.Delegate.UserDelegate.bind(IDFramework.Delegate),
         });
+        return commandResult;
       } catch (error) {
         console.error(`Error executing command for event '${eventName}':`, error);
         throw error;
@@ -875,7 +891,20 @@ class IDFramework {
       stores[storeName] = Alpine.store(storeName);
     }
     
-    await this.IDController.execute(eventName, payload, stores);
+    return await this.IDController.execute(eventName, payload, stores);
+  }
+
+  /**
+   * createOrUpdateUserInfo - Configurable hook for MetaID user registration / profile update
+   * Set window.__createOrUpdateUserInfoImpl to your implementation (e.g. assist API + wallet).
+   * @param {Object} opts - { userData: { name, bio?, avatar? }, oldUserData: { nameId, bioId, avatarId, chatpubkey }, options: { feeRate, network, assistDomain } }
+   * @returns {Promise<Object>} Result with txids etc.
+   */
+  static async createOrUpdateUserInfo(opts) {
+    if (typeof window.__createOrUpdateUserInfoImpl === 'function') {
+      return window.__createOrUpdateUserInfoImpl(opts);
+    }
+    throw new Error('User registration not configured. Set window.__createOrUpdateUserInfoImpl.');
   }
 }
 
